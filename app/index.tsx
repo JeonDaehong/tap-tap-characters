@@ -1,0 +1,793 @@
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import {
+  View,
+  Text,
+  Image,
+  Pressable,
+  StyleSheet,
+  Animated,
+  Modal,
+} from "react-native";
+import { useFocusEffect, Link } from "expo-router";
+import { Audio } from "expo-av";
+import CuteCat, { AnimationState } from "../components/CuteCat";
+import GachaModal from "../components/GachaModal";
+import FallingParticles from "../components/FallingParticles";
+import HPBar from "../components/HPBar";
+import AchievementModal from "../components/AchievementModal";
+import AchievementCelebration from "../components/AchievementCelebration";
+import { ALL_ACHIEVEMENTS, Achievement } from "../data/achievements";
+import {
+  ALL_CATS,
+  CatData,
+  GACHA_COST,
+  GRADE_CONFIG,
+  rollGacha,
+  hasParticleEffect,
+  hasCustomBackground,
+} from "../data/cats";
+import * as storage from "../utils/storage";
+
+export default function HomeScreen() {
+  const [score, setScore] = useState(0);
+  const [coins, setCoins] = useState(0);
+  const [danceFrame, setDanceFrame] = useState(0);
+  const [collection, setCollection] = useState<string[]>([]);
+  const [selectedCatId, setSelectedCatId] = useState("");
+  const [hp, setHp] = useState(100);
+  const [tapCount, setTapCount] = useState(0);
+
+  const [particleTrigger, setParticleTrigger] = useState(0);
+  const [gachaVisible, setGachaVisible] = useState(false);
+  const [gachaResult, setGachaResult] = useState<CatData | null>(null);
+  const [gachaIsNew, setGachaIsNew] = useState(false);
+  const [gachaForced, setGachaForced] = useState(false);
+
+  const [critText, setCritText] = useState(false);
+  const [coinPopup, setCoinPopup] = useState(false);
+  const [holyFlash, setHolyFlash] = useState(false);
+  const [gachaMenuVisible, setGachaMenuVisible] = useState(false);
+  const [comingSoonVisible, setComingSoonVisible] = useState(false);
+
+  const [tutorialDone, setTutorialDone] = useState(true);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [achievementModalVisible, setAchievementModalVisible] = useState(false);
+  const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null);
+  const celebrationQueue = useRef<Achievement[]>([]);
+
+  const bounceAnim = useRef(new Animated.Value(1)).current;
+  const flinchAnim = useRef(new Animated.Value(0)).current;
+  const critOpacity = useRef(new Animated.Value(0)).current;
+  const critScale = useRef(new Animated.Value(0.5)).current;
+  const coinOpacity = useRef(new Animated.Value(0)).current;
+  const coinTranslateY = useRef(new Animated.Value(0)).current;
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const critSoundRef = useRef<Audio.Sound | null>(null);
+  const holyFlashOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    (async () => {
+      const { sound } = await Audio.Sound.createAsync(
+        require("../assets/meow.wav"),
+        { volume: 0.3 }
+      );
+      soundRef.current = sound;
+      try {
+        const { sound: cs } = await Audio.Sound.createAsync(
+          require("../assets/sfx/critical.wav"),
+          { volume: 0.4 }
+        );
+        critSoundRef.current = cs;
+      } catch {}
+    })();
+    return () => {
+      soundRef.current?.unloadAsync();
+      critSoundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  // HP regen timer
+  useEffect(() => {
+    if (!selectedCatId) return;
+    const interval = setInterval(() => {
+      setHp(prev => {
+        const newHp = Math.min(100, prev + 1);
+        storage.setCatHP(selectedCatId, newHp, tapCount);
+        return newHp;
+      });
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [selectedCatId, tapCount]);
+
+  const showCelebration = useCallback((ach: Achievement) => {
+    if (celebratingAchievement) {
+      celebrationQueue.current.push(ach);
+    } else {
+      setCelebratingAchievement(ach);
+    }
+  }, [celebratingAchievement]);
+
+  const onCelebrationDone = useCallback(() => {
+    const next = celebrationQueue.current.shift();
+    setCelebratingAchievement(next ?? null);
+  }, []);
+
+  const tryUnlock = useCallback(async (id: string) => {
+    const current = await storage.getUnlockedAchievements();
+    if (current.includes(id)) return;
+    const updated = await storage.unlockAchievement(id);
+    setUnlockedAchievements(updated);
+    const ach = ALL_ACHIEVEMENTS.find(a => a.id === id);
+    if (ach) showCelebration(ach);
+  }, [showCelebration]);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const [s, c, sel, co, tut, achList] = await Promise.all([
+          storage.getScore(),
+          storage.getCollection(),
+          storage.getSelectedCat(),
+          storage.getCoins(),
+          storage.getTutorialComplete(),
+          storage.getUnlockedAchievements(),
+        ]);
+        setScore(s);
+        const validIds = new Set(ALL_CATS.map(cat => cat.id));
+        setCollection(c.filter(id => validIds.has(id)));
+        setSelectedCatId(sel);
+        setCoins(co);
+        setTutorialDone(tut);
+        setUnlockedAchievements(achList);
+
+        if (sel) {
+          const hpData = await storage.getCatHP(sel);
+          setHp(hpData.hp);
+          setTapCount(hpData.tapCount);
+        }
+
+        // Check score-based achievements on load
+        if (s >= 10000) tryUnlock("score_10k");
+        if (s >= 100000) tryUnlock("score_100k");
+        if (s >= 1000000) tryUnlock("score_1m");
+        if (co >= 1000) tryUnlock("coins_1000");
+        if (c.length >= 10) tryUnlock("collect_10");
+        if (c.some(id => ALL_CATS.find(cat => cat.id === id)?.grade === "SSS")) tryUnlock("sss_pull");
+
+        if (!tut) {
+          await storage.setCoins(100);
+          setCoins(100);
+          setGachaForced(true);
+          setGachaVisible(true);
+          const result = rollGacha();
+          setGachaResult(result);
+          setGachaIsNew(true);
+        } else {
+          // Already started => unlock first_start
+          tryUnlock("first_start");
+        }
+      })();
+    }, [])
+  );
+
+  const selectedCat = ALL_CATS.find(c => c.id === selectedCatId) ?? ALL_CATS[0];
+  const gradeConfig = GRADE_CONFIG[selectedCat.grade];
+
+  const animationState: AnimationState =
+    hp <= 4 ? "collapsed" : hp <= 50 ? "hurt" : "normal";
+
+  const handleTap = useCallback(() => {
+    // HP 0: no score/coin, only flinch
+    if (hp <= 0) {
+      soundRef.current?.replayAsync().catch(() => {});
+      flinchAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(flinchAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: 4, duration: 40, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: 0, duration: 30, useNativeDriver: true }),
+      ]).start();
+      return;
+    }
+
+    const isCrit = Math.random() * 100 < gradeConfig.critChance;
+    const pts = gradeConfig.scorePerTap * (isCrit ? 2 : 1);
+    const newScore = score + pts;
+    setScore(newScore);
+    storage.setScore(newScore);
+
+    // coinChance: C=1 → 10%, B=1.1 → 11%, ... SSS=3 → 30%
+    if (Math.random() < gradeConfig.coinChance * 0.1) {
+      const newCoins = coins + 1;
+      setCoins(newCoins);
+      storage.setCoins(newCoins);
+      setCoinPopup(true);
+      coinOpacity.setValue(1);
+      coinTranslateY.setValue(0);
+      Animated.parallel([
+        Animated.timing(coinOpacity, { toValue: 0, duration: 800, useNativeDriver: true }),
+        Animated.timing(coinTranslateY, { toValue: -40, duration: 800, useNativeDriver: true }),
+      ]).start(() => setCoinPopup(false));
+    }
+
+    const activeFrames =
+      animationState === "collapsed" ? 1
+      : animationState === "hurt" && selectedCat.hurtFrames ? selectedCat.hurtFrames.length
+      : selectedCat.danceFrames?.length ?? gradeConfig.danceFrames;
+    setDanceFrame(prev => (prev + 1) % activeFrames);
+
+    const newTapCount = tapCount + 1;
+    let newHp = hp;
+    if (newTapCount >= gradeConfig.hpLossInterval) {
+      newHp = Math.max(0, hp - 1);
+      setHp(newHp);
+      setTapCount(0);
+      storage.setCatHP(selectedCat.id, newHp, 0);
+    } else {
+      setTapCount(newTapCount);
+      storage.setCatHP(selectedCat.id, hp, newTapCount);
+    }
+
+    // Achievement checks
+    if (newScore >= 10000) tryUnlock("score_10k");
+    if (newScore >= 100000) tryUnlock("score_100k");
+    if (newScore >= 1000000) tryUnlock("score_1m");
+    if (coins >= 1000) tryUnlock("coins_1000");
+    if (newHp === 0) {
+      storage.incrementHpZeroCount().then(count => {
+        if (count >= 10) tryUnlock("hp_zero_10");
+      });
+    }
+
+    if (hasParticleEffect(selectedCat.grade) && selectedCat.particleEmoji) {
+      setParticleTrigger(prev => prev + 1);
+    }
+
+    // S+ grade holy flash effect
+    if (hasCustomBackground(selectedCat.grade)) {
+      setHolyFlash(true);
+      holyFlashOpacity.setValue(0.6);
+      Animated.timing(holyFlashOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => setHolyFlash(false));
+    }
+
+    if (isCrit) {
+      setCritText(true);
+      critOpacity.setValue(1);
+      critScale.setValue(0.5);
+      Animated.parallel([
+        Animated.spring(critScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+        Animated.timing(critOpacity, { toValue: 0, duration: 1000, delay: 300, useNativeDriver: true }),
+      ]).start(() => setCritText(false));
+      critSoundRef.current?.replayAsync().catch(() => {});
+    }
+
+    soundRef.current?.replayAsync().catch(() => {});
+
+    if (animationState === "collapsed") {
+      flinchAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(flinchAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: 4, duration: 40, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: -4, duration: 40, useNativeDriver: true }),
+        Animated.timing(flinchAnim, { toValue: 0, duration: 30, useNativeDriver: true }),
+      ]).start();
+    } else {
+      bounceAnim.setValue(0.85);
+      Animated.spring(bounceAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [score, coins, hp, tapCount, bounceAnim, flinchAnim, animationState, selectedCat, gradeConfig, tryUnlock]);
+
+  const handleGacha = useCallback(async () => {
+    if (coins < GACHA_COST) return;
+    const newCoins = coins - GACHA_COST;
+    setCoins(newCoins);
+    await storage.setCoins(newCoins);
+
+    const result = rollGacha();
+    const isNew = !collection.includes(result.id);
+    if (isNew) {
+      const newCollection = await storage.addToCollection(result.id);
+      setCollection(newCollection);
+      await storage.initCatHP(result.id);
+    }
+
+    setGachaResult(result);
+    setGachaIsNew(isNew);
+    setGachaForced(false);
+    setGachaVisible(true);
+
+    if (result.grade === "SSS") tryUnlock("sss_pull");
+    const newCollLen = isNew ? collection.length + 1 : collection.length;
+    if (newCollLen >= 10) tryUnlock("collect_10");
+  }, [coins, collection, tryUnlock]);
+
+  const handleGachaClose = useCallback(async () => {
+    setGachaVisible(false);
+  }, []);
+
+  const handleTutorialStart = useCallback(async (cat: CatData) => {
+    const newCoins = coins - GACHA_COST;
+    setCoins(Math.max(0, newCoins));
+    await storage.setCoins(Math.max(0, newCoins));
+
+    const isNew = !collection.includes(cat.id);
+    if (isNew) {
+      const newCollection = await storage.addToCollection(cat.id);
+      setCollection(newCollection);
+    }
+    await storage.initCatHP(cat.id);
+    await storage.setSelectedCat(cat.id);
+    setSelectedCatId(cat.id);
+
+    const hpData = await storage.getCatHP(cat.id);
+    setHp(hpData.hp);
+    setTapCount(hpData.tapCount);
+
+    await storage.setTutorialComplete();
+    setTutorialDone(true);
+    setGachaVisible(false);
+    setGachaForced(false);
+    tryUnlock("first_start");
+  }, [coins, collection, tryUnlock]);
+
+  const bgColor = hasCustomBackground(selectedCat.grade) && selectedCat.backgroundColor
+    ? selectedCat.backgroundColor
+    : "#16213e";
+  const isHurtOrCollapsed = (animationState === "collapsed" && selectedCat.collapsedFrame) || (animationState === "hurt" && selectedCat.hurtFrames);
+  const catImgSource = selectedCat.danceFrames
+    ? (animationState === "collapsed" && selectedCat.collapsedFrame
+        ? selectedCat.collapsedFrame
+        : animationState === "hurt" && selectedCat.hurtFrames
+          ? selectedCat.hurtFrames[danceFrame % selectedCat.hurtFrames.length]
+          : selectedCat.danceFrames[danceFrame % selectedCat.danceFrames.length])
+    : null;
+  const catImgScale = isHurtOrCollapsed ? 2.5 : 2.5;
+
+  return (
+    <View style={[styles.container, { backgroundColor: bgColor }]}>
+      {hasParticleEffect(selectedCat.grade) && selectedCat.particleEmoji && (
+        <FallingParticles trigger={particleTrigger} emoji={selectedCat.particleEmoji} />
+      )}
+
+      {holyFlash && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: "#FFD700", opacity: holyFlashOpacity, zIndex: 50 }]}
+          pointerEvents="none"
+        />
+      )}
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <View style={styles.topLeft}>
+          <Pressable
+            style={styles.debugBtn}
+            onPress={async () => {
+              const c = coins + 100;
+              setCoins(c);
+              await storage.setCoins(c);
+            }}
+          >
+            <Text style={styles.debugBtnText}>+100💰</Text>
+          </Pressable>
+        </View>
+        <View style={styles.scoreArea}>
+          <Text style={styles.scoreLabel}>SCORE</Text>
+          <Text style={styles.scoreValue}>{score}</Text>
+        </View>
+        <View style={styles.topRight}>
+          <Text style={styles.coinText}>💰 {coins}</Text>
+        </View>
+      </View>
+
+      {/* Grade badge */}
+      <View style={[styles.gradeBadge, { backgroundColor: gradeConfig.color }]}>
+        <Text style={styles.gradeBadgeText}>{gradeConfig.label}</Text>
+      </View>
+
+      {critText && (
+        <Animated.Text style={[styles.critText, { opacity: critOpacity, transform: [{ scale: critScale }] }]}>
+          CRITICAL!
+        </Animated.Text>
+      )}
+
+      {coinPopup && (
+        <Animated.Text style={[styles.coinPopup, { opacity: coinOpacity, transform: [{ translateY: coinTranslateY }] }]}>
+          +1 💰
+        </Animated.Text>
+      )}
+
+      {/* Cat */}
+      <Pressable onPress={handleTap} style={styles.catArea}>
+        <Animated.View style={{ transform: [{ scale: bounceAnim }, { translateX: animationState === "collapsed" ? flinchAnim : 0 }] }}>
+          {catImgSource ? (
+            <Image
+              source={catImgSource}
+              style={{ width: 200, height: 200, transform: [{ scale: catImgScale }] }}
+              resizeMode="contain"
+            />
+          ) : (
+            <CuteCat
+              colors={selectedCat.colors}
+              size={180}
+              danceFrame={danceFrame}
+              totalFrames={gradeConfig.danceFrames}
+              animationState={animationState}
+            />
+          )}
+        </Animated.View>
+        <Image source={require("../assets/img/tap.png")} style={styles.tapHintImg} resizeMode="contain" />
+      </Pressable>
+
+      {/* HP bar below cat */}
+      <View style={{ marginTop: 10, marginBottom: 16 }}>
+        <HPBar current={hp} />
+      </View>
+
+      {/* Bottom game buttons */}
+      <View style={styles.bottomBar}>
+        <Link href="/collection" asChild>
+          <Pressable style={styles.bottomBtn}>
+            <Text style={styles.bottomBtnEmoji}>📚</Text>
+            <Text style={styles.bottomBtnLabel}>컬렉션</Text>
+          </Pressable>
+        </Link>
+
+        <Pressable
+          onPress={() => setGachaMenuVisible(true)}
+          style={styles.bottomBtn}
+        >
+          <Text style={styles.bottomBtnEmoji}>🎁</Text>
+          <Text style={styles.bottomBtnLabel}>뽑기</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setAchievementModalVisible(true)}
+          style={styles.bottomBtn}
+        >
+          <Text style={styles.bottomBtnEmoji}>🏅</Text>
+          <Text style={styles.bottomBtnLabel}>업적</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setComingSoonVisible(true)}
+          style={styles.bottomBtn}
+        >
+          <Text style={styles.bottomBtnEmoji}>🏆</Text>
+          <Text style={styles.bottomBtnLabel}>랭킹</Text>
+        </Pressable>
+      </View>
+
+      {/* Gacha sub-menu modal */}
+      <Modal
+        visible={gachaMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setGachaMenuVisible(false)}
+      >
+        <Pressable style={styles.gachaOverlay} onPress={() => setGachaMenuVisible(false)}>
+          <View style={styles.gachaMenu}>
+            <Text style={styles.gachaMenuTitle}>뽑기</Text>
+
+            <Pressable
+              onPress={() => { setGachaMenuVisible(false); handleGacha(); }}
+              style={[styles.gachaMenuItem, coins < GACHA_COST && styles.gachaMenuItemDisabled]}
+              disabled={coins < GACHA_COST}
+            >
+              <Text style={styles.gachaMenuEmoji}>🎁</Text>
+              <Text style={styles.gachaMenuText}>일반 뽑기</Text>
+              <Text style={styles.gachaMenuCost}>💰 {GACHA_COST}</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setGachaMenuVisible(false); setComingSoonVisible(true); }}
+              style={styles.gachaMenuItem}
+            >
+              <Text style={styles.gachaMenuEmoji}>✨</Text>
+              <Text style={styles.gachaMenuText}>특수 뽑기</Text>
+              <Text style={styles.gachaMenuSoon}>SOON</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setGachaMenuVisible(false); setComingSoonVisible(true); }}
+              style={styles.gachaMenuItem}
+            >
+              <Text style={styles.gachaMenuEmoji}>👗</Text>
+              <Text style={styles.gachaMenuText}>코스튬 뽑기</Text>
+              <Text style={styles.gachaMenuSoon}>SOON</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setGachaMenuVisible(false)} style={styles.gachaMenuClose}>
+              <Text style={styles.gachaMenuCloseText}>닫기</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <GachaModal
+        visible={gachaVisible}
+        cat={gachaResult}
+        isNew={gachaIsNew}
+        forced={gachaForced}
+        onClose={handleGachaClose}
+        onTutorialStart={handleTutorialStart}
+      />
+
+      <AchievementModal
+        visible={achievementModalVisible}
+        unlocked={unlockedAchievements}
+        onClose={() => setAchievementModalVisible(false)}
+      />
+
+      <AchievementCelebration
+        achievement={celebratingAchievement}
+        onDone={onCelebrationDone}
+      />
+
+      {/* Coming Soon Modal */}
+      <Modal
+        visible={comingSoonVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setComingSoonVisible(false)}
+      >
+        <Pressable style={styles.comingSoonOverlay} onPress={() => setComingSoonVisible(false)}>
+          <View style={styles.comingSoonBox}>
+            <Text style={styles.comingSoonEmoji}>🚧</Text>
+            <Text style={styles.comingSoonTitle}>준비중</Text>
+            <Text style={styles.comingSoonDesc}>열심히 준비하고 있어요!{"\n"}조금만 기다려주세요!</Text>
+            <Pressable onPress={() => setComingSoonVisible(false)} style={styles.comingSoonBtn}>
+              <Text style={styles.comingSoonBtnText}>확인</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    paddingHorizontal: 16,
+    marginBottom: 4,
+    zIndex: 999,
+  },
+  topSpacer: {
+    flex: 1,
+  },
+  scoreArea: {
+    flex: 1,
+    alignItems: "center",
+  },
+  coinArea: {
+    flex: 1,
+    alignItems: "flex-end",
+  },
+  scoreLabel: {
+    fontSize: 11,
+    color: "#888",
+    letterSpacing: 3,
+  },
+  scoreValue: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFD700",
+  },
+  coinText: {
+    fontSize: 14,
+    color: "#FFA500",
+    fontWeight: "bold",
+  },
+  gradeBadge: {
+    paddingHorizontal: 14,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  gradeBadgeText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  critText: {
+    position: "absolute",
+    top: "35%",
+    fontSize: 36,
+    fontWeight: "bold",
+    color: "#FF4444",
+    textShadowColor: "#000",
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+    zIndex: 10,
+  },
+  coinPopup: {
+    position: "absolute",
+    top: "40%",
+    right: "25%",
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#FFA500",
+    zIndex: 10,
+  },
+  catArea: {
+    alignItems: "center",
+    padding: 20,
+  },
+  tapHintImg: {
+    width: 140,
+    height: 70,
+    marginTop: 8,
+  },
+  bottomBar: {
+    flexDirection: "row",
+    width: "100%",
+    paddingHorizontal: 16,
+    gap: 10,
+    paddingBottom: 12,
+  },
+  bottomBtn: {
+    flex: 1,
+    backgroundColor: "#2a2a5a",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#3a3a6a",
+  },
+  bottomBtnEmoji: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  bottomBtnLabel: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  gachaOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gachaMenu: {
+    backgroundColor: "#1a1a2e",
+    borderRadius: 18,
+    padding: 24,
+    width: "80%",
+    maxWidth: 320,
+    alignItems: "center",
+  },
+  gachaMenuTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  gachaMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2a2a5a",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: "100%",
+    marginBottom: 10,
+  },
+  gachaMenuItemDisabled: {
+    backgroundColor: "#333",
+    opacity: 0.5,
+  },
+  gachaMenuEmoji: {
+    fontSize: 22,
+    marginRight: 10,
+  },
+  gachaMenuText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
+    flex: 1,
+  },
+  gachaMenuCost: {
+    color: "#FFA500",
+    fontSize: 13,
+    fontWeight: "bold",
+  },
+  gachaMenuSoon: {
+    color: "#888",
+    fontSize: 11,
+    fontWeight: "bold",
+    backgroundColor: "#333",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  gachaMenuClose: {
+    marginTop: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+  },
+  gachaMenuCloseText: {
+    color: "#888",
+    fontSize: 14,
+  },
+  debugBtn: {
+    backgroundColor: "#444",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  debugBtnText: {
+    color: "#FFD700",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  topLeft: {
+    flex: 1,
+    alignItems: "flex-start" as const,
+    zIndex: 999,
+  },
+  topRight: {
+    flex: 1,
+    alignItems: "flex-end" as const,
+  },
+  comingSoonOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+  },
+  comingSoonBox: {
+    backgroundColor: "#1a1a2e",
+    borderRadius: 20,
+    padding: 30,
+    alignItems: "center" as const,
+    width: 280,
+    borderWidth: 2,
+    borderColor: "#333",
+  },
+  comingSoonEmoji: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  comingSoonTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold" as const,
+    marginBottom: 8,
+  },
+  comingSoonDesc: {
+    color: "#aaa",
+    fontSize: 14,
+    textAlign: "center" as const,
+    lineHeight: 20,
+  },
+  comingSoonBtn: {
+    marginTop: 20,
+    backgroundColor: "#2a2a5a",
+    paddingHorizontal: 36,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  comingSoonBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold" as const,
+  },
+});
