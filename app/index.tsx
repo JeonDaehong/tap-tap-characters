@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Animated,
   Modal,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { useFocusEffect, Link } from "expo-router";
 import { Audio } from "expo-av";
@@ -25,6 +27,7 @@ import {
   rollGacha,
   hasParticleEffect,
   hasCustomBackground,
+  hasDarkStormEffect,
 } from "../data/cats";
 import * as storage from "../utils/storage";
 
@@ -46,6 +49,7 @@ export default function HomeScreen() {
   const [critText, setCritText] = useState(false);
   const [coinPopup, setCoinPopup] = useState(false);
   const [holyFlash, setHolyFlash] = useState(false);
+  const [darkStorm, setDarkStorm] = useState(false);
   const [gachaMenuVisible, setGachaMenuVisible] = useState(false);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
 
@@ -63,7 +67,17 @@ export default function HomeScreen() {
   const coinTranslateY = useRef(new Animated.Value(0)).current;
   const soundRef = useRef<Audio.Sound | null>(null);
   const critSoundRef = useRef<Audio.Sound | null>(null);
+  const darkSoundRef = useRef<Audio.Sound | null>(null);
+  const darkCritSoundRef = useRef<Audio.Sound | null>(null);
   const holyFlashOpacity = useRef(new Animated.Value(0)).current;
+  const darkStormOpacity = useRef(new Animated.Value(0)).current;
+  const auraScale = useRef(new Animated.Value(0)).current;
+  const auraOpacity = useRef(new Animated.Value(0)).current;
+  const aura2Scale = useRef(new Animated.Value(0)).current;
+  const aura2Opacity = useRef(new Animated.Value(0)).current;
+  const aura3Scale = useRef(new Animated.Value(0)).current;
+  const aura3Opacity = useRef(new Animated.Value(0)).current;
+  const darkPulseScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     (async () => {
@@ -79,10 +93,26 @@ export default function HomeScreen() {
         );
         critSoundRef.current = cs;
       } catch {}
+      try {
+        const { sound: ds } = await Audio.Sound.createAsync(
+          require("../assets/sfx/dark.mp3"),
+          { volume: 0.5 }
+        );
+        darkSoundRef.current = ds;
+      } catch {}
+      try {
+        const { sound: dcs } = await Audio.Sound.createAsync(
+          require("../assets/sfx/dark_cri.mp3"),
+          { volume: 0.6 }
+        );
+        darkCritSoundRef.current = dcs;
+      } catch {}
     })();
     return () => {
       soundRef.current?.unloadAsync();
       critSoundRef.current?.unloadAsync();
+      darkSoundRef.current?.unloadAsync();
+      darkCritSoundRef.current?.unloadAsync();
     };
   }, []);
 
@@ -98,6 +128,18 @@ export default function HomeScreen() {
     }, 60000);
     return () => clearInterval(interval);
   }, [selectedCatId, tapCount]);
+
+  // Reload HP when app comes back from background
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", async (nextAppState: AppStateStatus) => {
+      if (nextAppState === "active" && selectedCatId) {
+        const hpData = await storage.getCatHP(selectedCatId);
+        setHp(hpData.hp);
+        setTapCount(hpData.tapCount);
+      }
+    });
+    return () => subscription.remove();
+  }, [selectedCatId]);
 
   const showCelebration = useCallback((ach: Achievement) => {
     if (celebratingAchievement) {
@@ -251,6 +293,60 @@ export default function HomeScreen() {
       Animated.timing(holyFlashOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => setHolyFlash(false));
     }
 
+    // SSS grade dark storm + multi-layer aura effect
+    if (hasDarkStormEffect(selectedCat.grade)) {
+      setDarkStorm(true);
+      darkStormOpacity.setValue(0.9);
+      darkPulseScale.setValue(1);
+
+      // First aura (innermost, fast)
+      auraScale.setValue(0.3);
+      auraOpacity.setValue(1);
+
+      // Second aura (middle, medium)
+      aura2Scale.setValue(0.2);
+      aura2Opacity.setValue(0.8);
+
+      // Third aura (outermost, slow)
+      aura3Scale.setValue(0.1);
+      aura3Opacity.setValue(0.6);
+
+      Animated.parallel([
+        // Dark storm flash
+        Animated.sequence([
+          Animated.timing(darkStormOpacity, { toValue: 0.5, duration: 100, useNativeDriver: true }),
+          Animated.timing(darkStormOpacity, { toValue: 0.9, duration: 100, useNativeDriver: true }),
+          Animated.timing(darkStormOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]),
+        // Screen pulse
+        Animated.sequence([
+          Animated.timing(darkPulseScale, { toValue: 1.05, duration: 100, useNativeDriver: true }),
+          Animated.timing(darkPulseScale, { toValue: 1, duration: 200, useNativeDriver: true }),
+        ]),
+        // First aura - fast expand
+        Animated.spring(auraScale, { toValue: 2, friction: 4, tension: 100, useNativeDriver: true }),
+        Animated.timing(auraOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+        // Second aura - medium expand (delayed)
+        Animated.sequence([
+          Animated.delay(50),
+          Animated.spring(aura2Scale, { toValue: 2.2, friction: 4, tension: 80, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(50),
+          Animated.timing(aura2Opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        ]),
+        // Third aura - slow expand (more delayed)
+        Animated.sequence([
+          Animated.delay(100),
+          Animated.spring(aura3Scale, { toValue: 2.5, friction: 3, tension: 60, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(100),
+          Animated.timing(aura3Opacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ]),
+      ]).start(() => setDarkStorm(false));
+    }
+
     if (isCrit) {
       setCritText(true);
       critOpacity.setValue(1);
@@ -259,10 +355,22 @@ export default function HomeScreen() {
         Animated.spring(critScale, { toValue: 1, friction: 4, useNativeDriver: true }),
         Animated.timing(critOpacity, { toValue: 0, duration: 1000, delay: 300, useNativeDriver: true }),
       ]).start(() => setCritText(false));
-      critSoundRef.current?.replayAsync().catch(() => {});
+      // SSS grade uses dark_cri sound for critical, others use normal critical sound
+      if (!hasDarkStormEffect(selectedCat.grade)) {
+        critSoundRef.current?.replayAsync().catch(() => {});
+      }
     }
 
-    soundRef.current?.replayAsync().catch(() => {});
+    // Play sound - SSS grade uses dark sounds, others use normal meow
+    if (hasDarkStormEffect(selectedCat.grade)) {
+      if (isCrit && darkCritSoundRef.current) {
+        darkCritSoundRef.current.replayAsync().catch(() => {});
+      } else if (darkSoundRef.current) {
+        darkSoundRef.current.replayAsync().catch(() => {});
+      }
+    } else {
+      soundRef.current?.replayAsync().catch(() => {});
+    }
 
     if (animationState === "collapsed") {
       flinchAnim.setValue(0);
@@ -363,6 +471,13 @@ export default function HomeScreen() {
         />
       )}
 
+      {darkStorm && (
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { backgroundColor: "#1a0a2e", opacity: darkStormOpacity, zIndex: 50 }]}
+          pointerEvents="none"
+        />
+      )}
+
       {/* Top bar */}
       <View style={styles.topBar}>
         <View style={styles.topLeft}>
@@ -405,23 +520,63 @@ export default function HomeScreen() {
 
       {/* Cat */}
       <Pressable onPress={handleTap} style={styles.catArea}>
-        <Animated.View style={{ transform: [{ scale: bounceAnim }, { translateX: animationState === "collapsed" ? flinchAnim : 0 }] }}>
-          {catImgSource ? (
-            <Image
-              source={catImgSource}
-              style={{ width: 200, height: 200, transform: [{ scale: catImgScale }] }}
-              resizeMode="contain"
-            />
-          ) : (
-            <CuteCat
-              colors={selectedCat.colors}
-              size={180}
-              danceFrame={danceFrame}
-              totalFrames={gradeConfig.danceFrames}
-              animationState={animationState}
-            />
+        <View style={styles.catContainer}>
+          {/* SSS Multi-layer Aura effects */}
+          {darkStorm && hasDarkStormEffect(selectedCat.grade) && (
+            <>
+              {/* Third aura - outermost, dark purple */}
+              <Animated.View
+                style={[
+                  styles.auraEffect3,
+                  {
+                    opacity: aura3Opacity,
+                    transform: [{ scale: aura3Scale }],
+                  },
+                ]}
+                pointerEvents="none"
+              />
+              {/* Second aura - middle, purple */}
+              <Animated.View
+                style={[
+                  styles.auraEffect2,
+                  {
+                    opacity: aura2Opacity,
+                    transform: [{ scale: aura2Scale }],
+                  },
+                ]}
+                pointerEvents="none"
+              />
+              {/* First aura - innermost, bright purple */}
+              <Animated.View
+                style={[
+                  styles.auraEffect,
+                  {
+                    opacity: auraOpacity,
+                    transform: [{ scale: auraScale }],
+                  },
+                ]}
+                pointerEvents="none"
+              />
+            </>
           )}
-        </Animated.View>
+          <Animated.View style={{ transform: [{ scale: bounceAnim }, { translateX: animationState === "collapsed" ? flinchAnim : 0 }] }}>
+            {catImgSource ? (
+              <Image
+                source={catImgSource}
+                style={{ width: 200, height: 200, transform: [{ scale: catImgScale }] }}
+                resizeMode="contain"
+              />
+            ) : (
+              <CuteCat
+                colors={selectedCat.colors}
+                size={180}
+                danceFrame={danceFrame}
+                totalFrames={gradeConfig.danceFrames}
+                animationState={animationState}
+              />
+            )}
+          </Animated.View>
+        </View>
         <Image source={require("../assets/img/tap.png")} style={styles.tapHintImg} resizeMode="contain" />
       </Pressable>
 
@@ -789,5 +944,49 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "bold" as const,
+  },
+  catContainer: {
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    position: "relative" as const,
+  },
+  auraEffect: {
+    position: "absolute" as const,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: "rgba(107, 0, 153, 0.3)",
+    borderWidth: 4,
+    borderColor: "#9B30FF",
+    shadowColor: "#9B30FF",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 40,
+  },
+  auraEffect2: {
+    position: "absolute" as const,
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: "rgba(75, 0, 130, 0.2)",
+    borderWidth: 3,
+    borderColor: "#6B0099",
+    shadowColor: "#6B0099",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 50,
+  },
+  auraEffect3: {
+    position: "absolute" as const,
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: "rgba(30, 0, 50, 0.15)",
+    borderWidth: 2,
+    borderColor: "#4B0082",
+    shadowColor: "#4B0082",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 60,
   },
 });

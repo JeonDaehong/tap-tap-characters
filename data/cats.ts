@@ -1,5 +1,5 @@
 export type CatGrade = "C" | "B" | "A" | "S" | "SS" | "SSS";
-export type CatRace = "인간족" | "수인족" | "천족" | "마인" | "골렘족" | "요정족" | "악마" | "기계족";
+export type CatRace = "인간족" | "수인족" | "천족" | "마인" | "골렘족" | "요정족" | "악마" | "기계족" | "7영웅";
 
 export interface CatColors {
   body: string;
@@ -54,7 +54,7 @@ export const GRADE_CONFIG: Record<CatGrade, GradeConfig> = {
   SSS: { label: "SSS", color: "#FF4444", weight: 1,  scorePerTap: 2, coinChance: 3,   danceFrames: 12, critChance: 10, hpLossInterval: 30 },
 };
 
-export const ALL_RACES: CatRace[] = ["인간족", "수인족", "천족", "마인", "골렘족", "요정족", "악마", "기계족"];
+export const ALL_RACES: CatRace[] = ["7영웅", "인간족", "수인족", "천족", "마인", "골렘족", "요정족", "악마", "기계족"];
 export const ALL_GRADES: CatGrade[] = ["SSS", "SS", "S", "A", "B", "C"];
 
 // Grade feature helpers
@@ -69,6 +69,9 @@ export function hasDialogue(grade: CatGrade): boolean {
 }
 export function hasSFX(grade: CatGrade): boolean {
   return ["SS", "SSS"].includes(grade);
+}
+export function hasDarkStormEffect(grade: CatGrade): boolean {
+  return grade === "SSS";
 }
 
 export const ALL_CATS: CatData[] = [
@@ -121,6 +124,29 @@ export const ALL_CATS: CatData[] = [
   },
   // === B Grade ===
   {
+    id: "minky",
+    name: "밍키",
+    description: "호기심 많은 수인족 소녀. 귀를 쫑긋 세우고 주변을 탐색하는 걸 좋아한다.",
+    grade: "B",
+    race: "수인족",
+    colors: { body: "#FFB6C1", belly: "#FFF0F5", ear: "#FF69B4", eye: "#8B4513", nose: "#FF1493", cheek: "#FFB6C1" },
+    danceFrames: [
+      require("../assets/img/a_1.png"),
+      require("../assets/img/a_2.png"),
+      require("../assets/img/a_3.png"),
+      require("../assets/img/a_4.png"),
+      require("../assets/img/a_5.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/a_6.png"),
+      require("../assets/img/a_7.png"),
+      require("../assets/img/a_8.png"),
+    ],
+    collapsedFrame: require("../assets/img/a_9.png"),
+    thumbnail: require("../assets/img/a_100.png"),
+    listImage: require("../assets/img/a_1.png"),
+  },
+  {
     id: "byte",
     name: "바이트",
     description: "기계 부품으로 이루어진 로봇 거미. 가끔 삐빅 소리를 내며 감정을 표현한다.",
@@ -142,10 +168,64 @@ export const ALL_CATS: CatData[] = [
       require("../assets/img/metal_10.png"),
     ],
     collapsedFrame: require("../assets/img/metal_11.png"),
-    thumbnail: require("../assets/img/metal_100.png"),
+    thumbnail: require("../assets/img/metal_100.jpg"),
     listImage: require("../assets/img/metal_1.png"),
   },
   // === A Grade ===
+  {
+    id: "tonya",
+    name: "암살자 토냐",
+    description: "그림자 속에서 움직이는 수인족 암살자. 소리 없이 다가와 목표를 처리한다.",
+    grade: "A",
+    race: "수인족",
+    colors: { body: "#2F2F2F", belly: "#4A4A4A", ear: "#1A1A1A", eye: "#FFD700", nose: "#333333", cheek: "#3D3D3D" },
+    danceFrames: [
+      require("../assets/img/b_1.png"),
+      require("../assets/img/b_2.png"),
+      require("../assets/img/b_3.png"),
+      require("../assets/img/b_4.png"),
+      require("../assets/img/b_5.png"),
+      require("../assets/img/b_6.png"),
+      require("../assets/img/b_7.png"),
+      require("../assets/img/b_8.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/b_9.png"),
+      require("../assets/img/b_10.png"),
+      require("../assets/img/b_11.png"),
+      require("../assets/img/b_12.png"),
+    ],
+    collapsedFrame: require("../assets/img/b_13.png"),
+    thumbnail: require("../assets/img/b_100.png"),
+    listImage: require("../assets/img/b_1.png"),
+    particleEmoji: "🐾",
+  },
+  {
+    id: "hecarim",
+    name: "헤카림",
+    description: "어둠 속에서 방황하는 악마. 도깨비불을 따라다니며 영혼을 수집한다.",
+    grade: "A",
+    race: "악마",
+    colors: { body: "#1A1A2E", belly: "#2D2D44", ear: "#0F0F1A", eye: "#00BFFF", nose: "#1A1A2E", cheek: "#252540" },
+    danceFrames: [
+      require("../assets/img/ho_1.png"),
+      require("../assets/img/ho_2.png"),
+      require("../assets/img/ho_3.png"),
+      require("../assets/img/ho_4.png"),
+      require("../assets/img/ho_5.png"),
+      require("../assets/img/ho_6.png"),
+      require("../assets/img/ho_7.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/ho_8.png"),
+      require("../assets/img/ho_9.png"),
+      require("../assets/img/ho_10.png"),
+    ],
+    collapsedFrame: require("../assets/img/ho_11.png"),
+    thumbnail: require("../assets/img/ho_100.png"),
+    listImage: require("../assets/img/ho_1.png"),
+    particleEmoji: "💠",
+  },
   {
     id: "orange",
     name: "아이돌 미나",
@@ -178,6 +258,36 @@ export const ALL_CATS: CatData[] = [
   },
   // === S Grade ===
   {
+    id: "seraph",
+    name: "세라피",
+    description: "하늘에서 내려온 천족의 천사. 신성한 날개로 모든 이를 축복한다.",
+    grade: "S",
+    race: "천족",
+    colors: { body: "#E6E6FA", belly: "#FFF8F0", ear: "#DDA0DD", eye: "#87CEEB", nose: "#FFB6C1", cheek: "#E6E6FA" },
+    danceFrames: [
+      require("../assets/img/y_1.png"),
+      require("../assets/img/y_2.png"),
+      require("../assets/img/y_3.png"),
+      require("../assets/img/y_4.png"),
+      require("../assets/img/y_5.png"),
+      require("../assets/img/y_6.png"),
+      require("../assets/img/y_7.png"),
+      require("../assets/img/y_8.png"),
+      require("../assets/img/y_9.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/y_10.png"),
+      require("../assets/img/y_11.png"),
+      require("../assets/img/y_12.png"),
+      require("../assets/img/y_13.png"),
+    ],
+    collapsedFrame: require("../assets/img/y_14.png"),
+    thumbnail: require("../assets/img/y_100.png"),
+    listImage: require("../assets/img/y_1.png"),
+    particleEmoji: "🌟",
+    backgroundColor: "#1a3040",
+  },
+  {
     id: "lumiel",
     name: "성기사 루미엘",
     description: "신성한 빛의 힘을 다루는 성기사. 어둠을 정화하는 것이 그녀의 사명이다.",
@@ -202,10 +312,77 @@ export const ALL_CATS: CatData[] = [
       require("../assets/img/m_13.png"),
     ],
     collapsedFrame: require("../assets/img/m_14.png"),
-    thumbnail: require("../assets/img/m_100.png"),
+    thumbnail: require("../assets/img/m_100.jpg"),
     listImage: require("../assets/img/m_1.png"),
     particleEmoji: "✨",
     backgroundColor: "#1a1040",
+  },
+  {
+    id: "balrog",
+    name: "발록",
+    description: "지옥에서 올라온 악마의 군주. 불꽃과 어둠을 다루며 공포를 퍼뜨린다.",
+    grade: "S",
+    race: "악마",
+    colors: { body: "#8B0000", belly: "#2F0000", ear: "#4A0000", eye: "#FF4500", nose: "#1A0000", cheek: "#660000" },
+    danceFrames: [
+      require("../assets/img/ack_1.png"),
+      require("../assets/img/ack_2.png"),
+      require("../assets/img/ack_3.png"),
+      require("../assets/img/ack_4.png"),
+      require("../assets/img/ack_5.png"),
+      require("../assets/img/ack_6.png"),
+      require("../assets/img/ack_7.png"),
+      require("../assets/img/ack_8.png"),
+      require("../assets/img/ack_9.png"),
+      require("../assets/img/ack_10.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/ack_11.png"),
+      require("../assets/img/ack_12.png"),
+      require("../assets/img/ack_13.png"),
+      require("../assets/img/ack_14.png"),
+    ],
+    collapsedFrame: require("../assets/img/ack_15.png"),
+    thumbnail: require("../assets/img/ack_100.png"),
+    listImage: require("../assets/img/ack_1.png"),
+    particleEmoji: "😈",
+    backgroundColor: "#2a0a0a",
+  },
+  // === SSS Grade ===
+  {
+    id: "nox",
+    name: "7영웅 녹스",
+    description: "7영웅 중 어둠을 지배하는 자. 그의 존재만으로도 빛이 사라진다.",
+    grade: "SSS",
+    race: "7영웅",
+    colors: { body: "#0D0D0D", belly: "#1A1A1A", ear: "#000000", eye: "#6B0099", nose: "#0D0D0D", cheek: "#1F1F1F" },
+    danceFrames: [
+      require("../assets/img/sh_1.png"),
+      require("../assets/img/sh_2.png"),
+      require("../assets/img/sh_3.png"),
+      require("../assets/img/sh_4.png"),
+      require("../assets/img/sh_5.png"),
+      require("../assets/img/sh_6.png"),
+      require("../assets/img/sh_7.png"),
+      require("../assets/img/sh_8.png"),
+      require("../assets/img/sh_9.png"),
+      require("../assets/img/sh_10.png"),
+      require("../assets/img/sh_11.png"),
+      require("../assets/img/sh_12.png"),
+      require("../assets/img/sh_13.png"),
+      require("../assets/img/sh_14.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/sh_15.png"),
+      require("../assets/img/sh_16.png"),
+      require("../assets/img/sh_17.png"),
+      require("../assets/img/sh_18.png"),
+    ],
+    collapsedFrame: require("../assets/img/sh_19.png"),
+    thumbnail: require("../assets/img/sh_100.png"),
+    listImage: require("../assets/img/sh_1.png"),
+    particleEmoji: "🌑",
+    backgroundColor: "#0a0a14",
   },
 ];
 
