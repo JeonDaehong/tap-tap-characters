@@ -20,6 +20,12 @@ export default function Layout() {
           }}
         />
         <Stack.Screen
+          name="game"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
           name="collection"
           options={{
             title: "컬렉션",
