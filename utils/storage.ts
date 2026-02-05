@@ -58,6 +58,19 @@ export async function getTutorialComplete(): Promise<boolean> {
 export async function setTutorialComplete(): Promise<void> {
   await AsyncStorage.setItem(TUTORIAL_KEY, "true");
 }
+export async function getTutorialStep(): Promise<number> {
+  const v = await AsyncStorage.getItem("cat_tap_tutorial_step");
+  return v ? parseInt(v, 10) : 0;
+}
+export async function setTutorialStep(step: number): Promise<void> {
+  await AsyncStorage.setItem("cat_tap_tutorial_step", step.toString());
+}
+export async function getTutorialCatId(): Promise<string> {
+  return (await AsyncStorage.getItem("cat_tap_tutorial_cat")) ?? "";
+}
+export async function setTutorialCatId(catId: string): Promise<void> {
+  await AsyncStorage.setItem("cat_tap_tutorial_cat", catId);
+}
 
 // --- HP System ---
 export interface CatHPData {

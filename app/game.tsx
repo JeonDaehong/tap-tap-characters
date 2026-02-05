@@ -10,7 +10,7 @@ import {
   AppState,
   AppStateStatus,
 } from "react-native";
-import { useFocusEffect, Link, useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Audio } from "expo-av";
 import CuteCat, { AnimationState } from "../components/CuteCat";
 import GachaModal from "../components/GachaModal";
@@ -55,7 +55,7 @@ export default function GameScreen() {
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
 
   const [tutorialDone, setTutorialDone] = useState(true);
-  const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기
+  const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기, 3=tap 컬렉션
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementModalVisible, setAchievementModalVisible] = useState(false);
   const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null);
@@ -199,11 +199,18 @@ export default function GameScreen() {
         if (c.some(id => ALL_CATS.find(cat => cat.id === id)?.grade === "SSS")) tryUnlock("sss_pull");
 
         if (!tut) {
-          await storage.setCoins(100);
-          setCoins(100);
-          setTutorialStep(1); // Start tutorial: tap 뽑기 button
+          // Check if tutorial is mid-progress (e.g. came back from collection)
+          const savedStep = await storage.getTutorialStep();
+          if (savedStep > 0) {
+            setTutorialStep(savedStep);
+            // If tutorial completed in collection (step 0 stored), will be caught by tut check
+          } else {
+            await storage.setCoins(100);
+            setCoins(100);
+            setTutorialStep(1); // Start tutorial: tap 뽑기 button
+          }
         } else {
-          // Already started => unlock first_start
+          setTutorialStep(0);
           tryUnlock("first_start");
         }
       })();
@@ -222,13 +229,13 @@ export default function GameScreen() {
 
   const handleTutorialNormalGacha = useCallback(() => {
     if (tutorialStep === 2) {
-      setTutorialStep(0); // Tutorial done
       setGachaMenuVisible(false);
       setGachaForced(true);
       const result = rollGacha();
       setGachaResult(result);
       setGachaIsNew(true);
       setGachaVisible(true);
+      // Don't complete tutorial yet — step 3 comes after gacha closes
     }
   }, [tutorialStep]);
 
@@ -451,19 +458,15 @@ export default function GameScreen() {
       setCollection(newCollection);
     }
     await storage.initCatHP(cat.id);
-    await storage.setSelectedCat(cat.id);
-    setSelectedCatId(cat.id);
 
-    const hpData = await storage.getCatHP(cat.id);
-    setHp(hpData.hp);
-    setTapCount(hpData.tapCount);
+    // Don't auto-select — guide user to collection to select
+    await storage.setTutorialCatId(cat.id);
+    await storage.setTutorialStep(3);
 
-    await storage.setTutorialComplete();
-    setTutorialDone(true);
     setGachaVisible(false);
     setGachaForced(false);
-    tryUnlock("first_start");
-  }, [coins, collection, tryUnlock]);
+    setTutorialStep(3); // Move to step 3: tap 컬렉션
+  }, [coins, collection]);
 
   const bgColor = selectedCat && hasCustomBackground(selectedCat.grade) && selectedCat.backgroundColor
     ? selectedCat.backgroundColor
@@ -614,26 +617,33 @@ export default function GameScreen() {
       )}
 
       {/* Bottom game buttons */}
-      <View style={styles.bottomBar}>
-        <Link href="/collection" asChild>
+      <View style={[styles.bottomBar, tutorialStep > 0 && { zIndex: 60 }]}>
+        <View style={[{ flex: 1, overflow: "visible" }, tutorialStep === 3 && styles.tutorialBtnElevated]}>
+          {tutorialStep === 3 && (
+            <View style={[styles.tutorialHint, { left: 0 }]}>
+              <Text style={styles.tutorialHintText} numberOfLines={1}>👇 캐릭터를 장착하세요!</Text>
+            </View>
+          )}
           <Pressable
-            style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
-            disabled={tutorialStep > 0}
+            onPress={() => router.push("/collection")}
+            style={[styles.bottomBtn, tutorialStep > 0 && tutorialStep !== 3 && styles.bottomBtnDisabled, tutorialStep === 3 && styles.bottomBtnHighlight]}
+            disabled={tutorialStep > 0 && tutorialStep !== 3}
           >
             <Text style={styles.bottomBtnEmoji}>📚</Text>
             <Text style={styles.bottomBtnLabel}>컬렉션</Text>
           </Pressable>
-        </Link>
+        </View>
 
-        <View>
+        <View style={[{ flex: 1, overflow: "visible" }, tutorialStep === 1 && styles.tutorialBtnElevated]}>
           {tutorialStep === 1 && (
             <View style={styles.tutorialHint}>
-              <Text style={styles.tutorialHintText}>👇 여기를 눌러주세요!</Text>
+              <Text style={styles.tutorialHintText} numberOfLines={1}>👇 여기를 눌러주세요!</Text>
             </View>
           )}
           <Pressable
             onPress={tutorialStep === 1 ? handleTutorialGachaButton : () => setGachaMenuVisible(true)}
-            style={[styles.bottomBtn, tutorialStep === 1 && styles.bottomBtnHighlight]}
+            style={[styles.bottomBtn, tutorialStep === 1 && styles.bottomBtnHighlight, tutorialStep > 0 && tutorialStep !== 1 && styles.bottomBtnDisabled]}
+            disabled={tutorialStep > 0 && tutorialStep !== 1}
           >
             <Text style={styles.bottomBtnEmoji}>🎁</Text>
             <Text style={styles.bottomBtnLabel}>뽑기</Text>
@@ -672,7 +682,7 @@ export default function GameScreen() {
 
             {tutorialStep === 2 && (
               <View style={styles.tutorialHintInline}>
-                <Text style={styles.tutorialHintText}>👇 일반 뽑기를 눌러주세요!</Text>
+                <Text style={[styles.tutorialHintText, { color: "#fff" }]}>👇 일반 뽑기를 눌러주세요!</Text>
               </View>
             )}
 
@@ -745,6 +755,16 @@ export default function GameScreen() {
           <View style={styles.tutorialBanner}>
             <Text style={styles.tutorialBannerText}>💰 100 코인이 지급되었어요!</Text>
             <Text style={styles.tutorialBannerSubtext}>아래 뽑기 버튼을 눌러 캐릭터를 뽑아보세요!</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Tutorial Step 3 Overlay - guide to collection */}
+      {tutorialStep === 3 && (
+        <View style={styles.tutorialOverlayStep1} pointerEvents="none">
+          <View style={styles.tutorialBanner}>
+            <Text style={styles.tutorialBannerText}>🎉 새 캐릭터를 뽑았어요!</Text>
+            <Text style={styles.tutorialBannerSubtext}>컬렉션에서 캐릭터를 장착해보세요!</Text>
           </View>
         </View>
       )}
@@ -860,6 +880,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 10,
     paddingBottom: 12,
+    overflow: "visible",
   },
   bottomBtn: {
     flex: 1,
@@ -1128,45 +1149,62 @@ const styles = StyleSheet.create({
   },
   tutorialHint: {
     position: "absolute" as const,
-    top: -35,
-    left: 0,
-    right: 0,
-    alignItems: "center" as const,
+    top: -38,
+    alignSelf: "center" as const,
     zIndex: 100,
+    backgroundColor: "#FFD700",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   tutorialHintInline: {
     marginBottom: 10,
     alignItems: "center" as const,
   },
   tutorialHintText: {
-    color: "#FFD700",
-    fontSize: 14,
+    color: "#000",
+    fontSize: 15,
     fontWeight: "bold" as const,
-    textShadowColor: "#000",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    textAlign: "center" as const,
   },
   bottomBtnDisabled: {
-    opacity: 0.3,
+    opacity: 0.15,
+  },
+  tutorialBtnElevated: {
+    zIndex: 100,
   },
   bottomBtnHighlight: {
     borderColor: "#FFD700",
-    borderWidth: 3,
-    backgroundColor: "#3a3a7a",
+    borderWidth: 4,
+    backgroundColor: "#5a6aff",
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 15,
   },
   gachaMenuItemHighlight: {
     borderColor: "#FFD700",
     borderWidth: 3,
-    backgroundColor: "#3a5a3a",
+    backgroundColor: "#2a5a3a",
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 12,
+    elevation: 10,
   },
   gachaMenuItemDisabledTutorial: {
-    opacity: 0.3,
+    opacity: 0.2,
   },
   tutorialOverlayStep1: {
     position: "absolute" as const,
     top: 0,
     left: 0,
     right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
     paddingTop: 80,
     alignItems: "center" as const,
     zIndex: 50,

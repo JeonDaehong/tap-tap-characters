@@ -9,7 +9,7 @@ import {
   ScrollView,
   SectionList,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import CuteCat from "../components/CuteCat";
 import {
   ALL_CATS,
@@ -55,28 +55,47 @@ function buildSections(): Section[] {
 const sections = buildSections();
 
 export default function CollectionScreen() {
+  const router = useRouter();
   const [collection, setCollection] = useState<string[]>([]);
   const [selectedCatId, setSelectedCatId] = useState("");
   const [detailCat, setDetailCat] = useState<CatData | null>(null);
+  const [tutorialStep, setTutorialStep] = useState(0); // 0=none, 4=select card, 5=equip
+  const [tutorialCatId, setTutorialCatId] = useState("");
 
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [rawCollection, sel] = await Promise.all([
+        const [rawCollection, sel, tut, savedStep, savedCatId] = await Promise.all([
           storage.getCollection(),
           storage.getSelectedCat(),
+          storage.getTutorialComplete(),
+          storage.getTutorialStep(),
+          storage.getTutorialCatId(),
         ]);
         const validIds = new Set(ALL_CATS.map(cat => cat.id));
         const c = rawCollection.filter(id => validIds.has(id));
         setCollection(c);
         setSelectedCatId(sel);
+
+        if (!tut && savedStep === 3 && savedCatId) {
+          // Tutorial in progress — guide to select the new character
+          setTutorialStep(4);
+          setTutorialCatId(savedCatId);
+        } else {
+          setTutorialStep(0);
+        }
       })();
     }, [])
   );
 
   const handleCardPress = (cat: CatData) => {
     if (!collection.includes(cat.id)) return;
+    // During tutorial step 4, only allow tapping the tutorial cat
+    if (tutorialStep === 4 && cat.id !== tutorialCatId) return;
     setDetailCat(cat);
+    if (tutorialStep === 4) {
+      setTutorialStep(5); // Move to step 5: equip
+    }
   };
 
   const handleEquip = async () => {
@@ -84,17 +103,34 @@ export default function CollectionScreen() {
     setSelectedCatId(detailCat.id);
     await storage.setSelectedCat(detailCat.id);
     setDetailCat(null);
+
+    if (tutorialStep === 5) {
+      // Tutorial complete!
+      await storage.setTutorialComplete();
+      await storage.setTutorialStep(0);
+      await storage.setTutorialCatId("");
+      setTutorialStep(0);
+      // Go back to game
+      router.back();
+    }
   };
 
   const renderCard = (cat: CatData) => {
     const owned = collection.includes(cat.id);
     const isSelected = cat.id === selectedCatId;
     const grade = GRADE_CONFIG[cat.grade];
+    const isTutorialTarget = tutorialStep === 4 && cat.id === tutorialCatId;
+    const isTutorialDimmed = tutorialStep === 4 && cat.id !== tutorialCatId;
 
     return (
       <Pressable
         key={cat.id}
-        style={[styles.card, isSelected && styles.cardSelected]}
+        style={[
+          styles.card,
+          isSelected && styles.cardSelected,
+          isTutorialTarget && styles.cardTutorialHighlight,
+          isTutorialDimmed && { opacity: 0.3 },
+        ]}
         onPress={() => handleCardPress(cat)}
       >
         {cat.listImage ? (
@@ -120,12 +156,22 @@ export default function CollectionScreen() {
         {isSelected && owned && (
           <Text style={styles.selectedLabel}>사용 중</Text>
         )}
+        {isTutorialTarget && (
+          <Text style={styles.tutorialCardHint}>👆 눌러주세요!</Text>
+        )}
       </Pressable>
     );
   };
 
   return (
     <View style={styles.container}>
+      {/* Tutorial banner */}
+      {tutorialStep === 4 && (
+        <View style={styles.tutorialBanner}>
+          <Text style={styles.tutorialBannerText}>🎉 뽑은 캐릭터를 눌러서 장착해보세요!</Text>
+        </View>
+      )}
+
       <SectionList
         sections={sections}
         keyExtractor={(item, idx) => `row-${idx}`}
@@ -201,13 +247,23 @@ export default function CollectionScreen() {
                         <Text style={styles.equippedText}>사용 중</Text>
                       </View>
                     ) : (
-                      <Pressable style={styles.equipButton} onPress={handleEquip}>
-                        <Text style={styles.equipButtonText}>캐릭터 교체</Text>
+                      <View>
+                        {tutorialStep === 5 && (
+                          <Text style={styles.tutorialEquipHint}>👇 캐릭터를 장착하세요!</Text>
+                        )}
+                        <Pressable
+                          style={[styles.equipButton, tutorialStep === 5 && styles.equipButtonHighlight]}
+                          onPress={handleEquip}
+                        >
+                          <Text style={styles.equipButtonText}>캐릭터 교체</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    {tutorialStep === 0 && (
+                      <Pressable style={styles.closeButton} onPress={() => setDetailCat(null)}>
+                        <Text style={styles.closeButtonText}>닫기</Text>
                       </Pressable>
                     )}
-                    <Pressable style={styles.closeButton} onPress={() => setDetailCat(null)}>
-                      <Text style={styles.closeButtonText}>닫기</Text>
-                    </Pressable>
                   </View>
                 </>
               );
@@ -266,6 +322,11 @@ const styles = StyleSheet.create({
     borderColor: "#333",
   },
   cardSelected: { borderColor: "#FFD700" },
+  cardTutorialHighlight: {
+    borderColor: "#4CAF50",
+    borderWidth: 3,
+    backgroundColor: "#1a2e1a",
+  },
   catName: { color: "#fff", fontSize: 13, fontWeight: "bold", marginTop: 8 },
   gradeLabel: { fontSize: 11, marginTop: 2 },
   unknown: { color: "#555", fontSize: 14, marginTop: 8 },
@@ -307,11 +368,42 @@ const styles = StyleSheet.create({
   statKey: { color: "#888", fontSize: 12 },
   statVal: { color: "#fff", fontSize: 12, fontWeight: "bold" },
 
-  detailButtons: { marginTop: 20, flexDirection: "row", gap: 12 },
+  detailButtons: { marginTop: 20, flexDirection: "row", gap: 12, alignItems: "center" },
   equipButton: { backgroundColor: "#e94560", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  equipButtonHighlight: {
+    backgroundColor: "#e94560",
+    borderWidth: 3,
+    borderColor: "#FFD700",
+  },
   equipButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   equippedBadge: { backgroundColor: "#333", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   equippedText: { color: "#FFD700", fontSize: 16, fontWeight: "bold" },
   closeButton: { backgroundColor: "#333", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
   closeButtonText: { color: "#fff", fontSize: 16 },
+
+  // Tutorial styles
+  tutorialBanner: {
+    backgroundColor: "#2a5a2a",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  tutorialBannerText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "bold",
+  },
+  tutorialCardHint: {
+    color: "#4CAF50",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 4,
+  },
+  tutorialEquipHint: {
+    color: "#FFD700",
+    fontSize: 13,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 6,
+  },
 });

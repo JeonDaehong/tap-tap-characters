@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,34 +8,57 @@ import {
   Modal,
   BackHandler,
   Image,
-  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-
-const { width: SCREEN_W } = Dimensions.get("window");
+import { Audio } from "expo-av";
 
 export default function MenuScreen() {
   const router = useRouter();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [exitModalVisible, setExitModalVisible] = useState(false);
-  const [ballVisible, setBallVisible] = useState(false);
 
   const titleScale = useRef(new Animated.Value(0.8)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const buttonsOpacity = useRef(new Animated.Value(0)).current;
   const buttonsTranslateY = useRef(new Animated.Value(30)).current;
   const catBounce = useRef(new Animated.Value(0)).current;
-
-  // Ball animation
-  const ballX = useRef(new Animated.Value(-100)).current;
-  const ballY = useRef(new Animated.Value(-200)).current;
-  const ballScale = useRef(new Animated.Value(0.3)).current;
-  const ballRotate = useRef(new Animated.Value(0)).current;
-
-  // Impact effects
-  const impactScale = useRef(new Animated.Value(0)).current;
-  const impactOpacity = useRef(new Animated.Value(0)).current;
   const charShake = useRef(new Animated.Value(0)).current;
+
+  // Audio refs
+  const bgmRef = useRef<Audio.Sound | null>(null);
+  const tapSoundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    // Load sounds
+    (async () => {
+      try {
+        const { sound: bgm } = await Audio.Sound.createAsync(
+          require("../assets/sfx/bgm_menu.wav"),
+          { isLooping: true, volume: 0.3 }
+        );
+        bgmRef.current = bgm;
+        await bgm.playAsync();
+      } catch {}
+      try {
+        const { sound: tap } = await Audio.Sound.createAsync(
+          require("../assets/sfx/tap.wav"),
+          { volume: 0.6 }
+        );
+        tapSoundRef.current = tap;
+      } catch {}
+    })();
+
+    return () => {
+      bgmRef.current?.stopAsync().then(() => bgmRef.current?.unloadAsync());
+      tapSoundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  // Stop BGM when navigating away
+  const handleStartGame = useCallback(() => {
+    bgmRef.current?.stopAsync();
+    router.push("/game");
+  }, [router]);
 
   useEffect(() => {
     // Entrance animations
@@ -71,107 +94,30 @@ export default function MenuScreen() {
     return () => backHandler.remove();
   }, []);
 
-  const handleStartGame = () => {
-    router.push("/game");
-  };
-
   const handleExit = () => {
+    bgmRef.current?.stopAsync();
     BackHandler.exitApp();
   };
 
-  const handleCharacterTap = () => {
-    if (ballVisible) return; // Prevent spam
+  const handleCharacterTap = useCallback(() => {
+    // Play tap sound
+    tapSoundRef.current?.setPositionAsync(0).then(() => tapSoundRef.current?.playAsync());
 
-    // Random start from edges
-    const startPositions = [
-      { x: -100, y: 100 },   // left
-      { x: SCREEN_W + 50, y: 150 },  // right
-    ];
-    const start = startPositions[Math.floor(Math.random() * startPositions.length)];
-
-    ballX.setValue(start.x);
-    ballY.setValue(start.y);
-    ballScale.setValue(0.8);
-    ballRotate.setValue(0);
-    setBallVisible(true);
-
-    // Ball flying to center
-    Animated.parallel([
-      Animated.timing(ballX, {
-        toValue: SCREEN_W / 2 - 30,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(ballY, {
-        toValue: 180,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(ballRotate, {
-        toValue: 2,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Impact!
-      setBallVisible(false);
-
-      // Small impact burst at hit location
-      impactScale.setValue(0.5);
-      impactOpacity.setValue(1);
-      Animated.parallel([
-        Animated.timing(impactScale, {
-          toValue: 1.5,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(impactOpacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // Light character shake
-      Animated.sequence([
-        Animated.timing(charShake, { toValue: 8, duration: 40, useNativeDriver: true }),
-        Animated.timing(charShake, { toValue: -8, duration: 40, useNativeDriver: true }),
-        Animated.timing(charShake, { toValue: 4, duration: 40, useNativeDriver: true }),
-        Animated.timing(charShake, { toValue: 0, duration: 40, useNativeDriver: true }),
-      ]).start();
-    });
-  };
-
-  const ballRotateInterpolate = ballRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+    // Character shake
+    Animated.sequence([
+      Animated.timing(charShake, { toValue: 8, duration: 40, useNativeDriver: true }),
+      Animated.timing(charShake, { toValue: -8, duration: 40, useNativeDriver: true }),
+      Animated.timing(charShake, { toValue: 4, duration: 40, useNativeDriver: true }),
+      Animated.timing(charShake, { toValue: -4, duration: 30, useNativeDriver: true }),
+      Animated.timing(charShake, { toValue: 0, duration: 30, useNativeDriver: true }),
+    ]).start();
+  }, [charShake]);
 
   return (
     <View style={styles.container}>
       {/* Background decoration */}
       <View style={styles.bgDecoration1} />
       <View style={styles.bgDecoration2} />
-
-      {/* Flying ball */}
-      {ballVisible && (
-        <Animated.View
-          style={[
-            styles.flyingBall,
-            {
-              transform: [
-                { translateX: ballX },
-                { translateY: ballY },
-                { scale: ballScale },
-                { rotate: ballRotateInterpolate },
-              ],
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <Text style={styles.ballEmoji}>⚽</Text>
-        </Animated.View>
-      )}
 
       {/* Title Area */}
       <Animated.View
@@ -205,18 +151,6 @@ export default function MenuScreen() {
               resizeMode="contain"
             />
           </Animated.View>
-
-          {/* Impact burst effect */}
-          <Animated.View
-            style={[
-              styles.impactBurst,
-              {
-                opacity: impactOpacity,
-                transform: [{ scale: impactScale }],
-              },
-            ]}
-            pointerEvents="none"
-          />
         </Pressable>
         <Text style={styles.title}>탭탭 캐릭터즈</Text>
         <Text style={styles.subtitle}>탭하고 수집하고 성장하자!</Text>
@@ -290,7 +224,7 @@ export default function MenuScreen() {
 
             <View style={styles.settingItem}>
               <Text style={styles.settingLabel}>🎵 배경음악</Text>
-              <Text style={styles.settingValue}>준비중</Text>
+              <Text style={styles.settingValue}>ON</Text>
             </View>
 
             <View style={styles.settingItem}>
@@ -396,22 +330,6 @@ const styles = StyleSheet.create({
     height: 280,
     zIndex: 1,
     marginLeft: -130,
-  },
-  flyingBall: {
-    position: "absolute",
-    zIndex: 200,
-  },
-  ballEmoji: {
-    fontSize: 60,
-  },
-  impactBurst: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255, 255, 255, 0.8)",
-    borderWidth: 2,
-    borderColor: "#fff",
   },
   title: {
     fontSize: 38,
