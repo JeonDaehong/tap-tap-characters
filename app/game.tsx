@@ -9,6 +9,7 @@ import {
   Modal,
   AppState,
   AppStateStatus,
+  BackHandler,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Audio } from "expo-av";
@@ -57,6 +58,7 @@ export default function GameScreen() {
   const [tutorialDone, setTutorialDone] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기, 3=tap 컬렉션
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [sfxEnabled, setSfxEnabled] = useState(true);
   const [achievementModalVisible, setAchievementModalVisible] = useState(false);
   const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null);
   const celebrationQueue = useRef<Achievement[]>([]);
@@ -118,6 +120,15 @@ export default function GameScreen() {
     };
   }, []);
 
+  // Handle Android back button - go to main menu
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.replace("/");
+      return true;
+    });
+    return () => backHandler.remove();
+  }, [router]);
+
   // HP regen timer
   useEffect(() => {
     if (!selectedCatId) return;
@@ -168,13 +179,14 @@ export default function GameScreen() {
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [s, c, sel, co, tut, achList] = await Promise.all([
+        const [s, c, sel, co, tut, achList, sfx] = await Promise.all([
           storage.getScore(),
           storage.getCollection(),
           storage.getSelectedCat(),
           storage.getCoins(),
           storage.getTutorialComplete(),
           storage.getUnlockedAchievements(),
+          storage.getSfxEnabled(),
         ]);
         setScore(s);
         const validIds = new Set(ALL_CATS.map(cat => cat.id));
@@ -183,6 +195,7 @@ export default function GameScreen() {
         setCoins(co);
         setTutorialDone(tut);
         setUnlockedAchievements(achList);
+        setSfxEnabled(sfx);
 
         if (sel) {
           const hpData = await storage.getCatHP(sel);
@@ -248,7 +261,7 @@ export default function GameScreen() {
 
     // HP 0: no score/coin, only flinch
     if (hp <= 0) {
-      soundRef.current?.replayAsync().catch(() => {});
+      if (sfxEnabled) soundRef.current?.replayAsync().catch(() => {});
       flinchAnim.setValue(0);
       Animated.sequence([
         Animated.timing(flinchAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
@@ -383,20 +396,22 @@ export default function GameScreen() {
         Animated.timing(critOpacity, { toValue: 0, duration: 1000, delay: 300, useNativeDriver: true }),
       ]).start(() => setCritText(false));
       // SSS grade uses dark_cri sound for critical, others use normal critical sound
-      if (!hasDarkStormEffect(selectedCat.grade)) {
+      if (sfxEnabled && !hasDarkStormEffect(selectedCat.grade)) {
         critSoundRef.current?.replayAsync().catch(() => {});
       }
     }
 
     // Play sound - SSS grade uses dark sounds, others use normal meow
-    if (hasDarkStormEffect(selectedCat.grade)) {
-      if (isCrit && darkCritSoundRef.current) {
-        darkCritSoundRef.current.replayAsync().catch(() => {});
-      } else if (darkSoundRef.current) {
-        darkSoundRef.current.replayAsync().catch(() => {});
+    if (sfxEnabled) {
+      if (hasDarkStormEffect(selectedCat.grade)) {
+        if (isCrit && darkCritSoundRef.current) {
+          darkCritSoundRef.current.replayAsync().catch(() => {});
+        } else if (darkSoundRef.current) {
+          darkSoundRef.current.replayAsync().catch(() => {});
+        }
+      } else {
+        soundRef.current?.replayAsync().catch(() => {});
       }
-    } else {
-      soundRef.current?.replayAsync().catch(() => {});
     }
 
     if (animationState === "collapsed") {
@@ -417,7 +432,7 @@ export default function GameScreen() {
         useNativeDriver: true,
       }).start();
     }
-  }, [score, coins, hp, tapCount, bounceAnim, flinchAnim, animationState, selectedCat, gradeConfig, tryUnlock]);
+  }, [score, coins, hp, tapCount, bounceAnim, flinchAnim, animationState, selectedCat, gradeConfig, tryUnlock, sfxEnabled]);
 
   const handleGacha = useCallback(async () => {
     if (coins < GACHA_COST) return;
@@ -621,7 +636,7 @@ export default function GameScreen() {
         <View style={[{ flex: 1, overflow: "visible" }, tutorialStep === 3 && styles.tutorialBtnElevated]}>
           {tutorialStep === 3 && (
             <View style={[styles.tutorialHint, { left: 0 }]}>
-              <Text style={styles.tutorialHintText} numberOfLines={1}>👇 캐릭터를 장착하세요!</Text>
+              <Text style={styles.tutorialHintText}>👇 캐릭터를 장착하세요!</Text>
             </View>
           )}
           <Pressable
@@ -637,7 +652,7 @@ export default function GameScreen() {
         <View style={[{ flex: 1, overflow: "visible" }, tutorialStep === 1 && styles.tutorialBtnElevated]}>
           {tutorialStep === 1 && (
             <View style={styles.tutorialHint}>
-              <Text style={styles.tutorialHintText} numberOfLines={1}>👇 여기를 눌러주세요!</Text>
+              <Text style={styles.tutorialHintText}>👇 여기를 눌러주세요!</Text>
             </View>
           )}
           <Pressable
@@ -1150,7 +1165,6 @@ const styles = StyleSheet.create({
   tutorialHint: {
     position: "absolute" as const,
     top: -38,
-    alignSelf: "center" as const,
     zIndex: 100,
     backgroundColor: "#FFD700",
     paddingHorizontal: 14,
@@ -1158,6 +1172,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 2,
     borderColor: "#fff",
+    minWidth: 180,
   },
   tutorialHintInline: {
     marginBottom: 10,

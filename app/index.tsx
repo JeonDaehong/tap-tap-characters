@@ -8,14 +8,20 @@ import {
   Modal,
   BackHandler,
   Image,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Audio } from "expo-av";
+import * as storage from "../utils/storage";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export default function MenuScreen() {
   const router = useRouter();
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [exitModalVisible, setExitModalVisible] = useState(false);
+  const [sfxEnabled, setSfxEnabled] = useState(true);
+  const [bgmEnabled, setBgmEnabled] = useState(true);
 
   const titleScale = useRef(new Animated.Value(0.8)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -29,15 +35,24 @@ export default function MenuScreen() {
   const tapSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
-    // Load sounds
+    // Load settings and sounds
     (async () => {
+      const [sfx, bgm] = await Promise.all([
+        storage.getSfxEnabled(),
+        storage.getBgmEnabled(),
+      ]);
+      setSfxEnabled(sfx);
+      setBgmEnabled(bgm);
+
       try {
-        const { sound: bgm } = await Audio.Sound.createAsync(
+        const { sound: bgmSound } = await Audio.Sound.createAsync(
           require("../assets/sfx/bgm_menu.wav"),
           { isLooping: true, volume: 0.3 }
         );
-        bgmRef.current = bgm;
-        await bgm.playAsync();
+        bgmRef.current = bgmSound;
+        if (bgm) {
+          await bgmSound.playAsync();
+        }
       } catch {}
       try {
         const { sound: tap } = await Audio.Sound.createAsync(
@@ -53,6 +68,23 @@ export default function MenuScreen() {
       tapSoundRef.current?.unloadAsync();
     };
   }, []);
+
+  const toggleSfx = useCallback(async () => {
+    const newVal = !sfxEnabled;
+    setSfxEnabled(newVal);
+    await storage.setSfxEnabled(newVal);
+  }, [sfxEnabled]);
+
+  const toggleBgm = useCallback(async () => {
+    const newVal = !bgmEnabled;
+    setBgmEnabled(newVal);
+    await storage.setBgmEnabled(newVal);
+    if (newVal) {
+      bgmRef.current?.playAsync();
+    } else {
+      bgmRef.current?.pauseAsync();
+    }
+  }, [bgmEnabled]);
 
   // Stop BGM when navigating away
   const handleStartGame = useCallback(() => {
@@ -101,7 +133,9 @@ export default function MenuScreen() {
 
   const handleCharacterTap = useCallback(() => {
     // Play tap sound
-    tapSoundRef.current?.setPositionAsync(0).then(() => tapSoundRef.current?.playAsync());
+    if (sfxEnabled) {
+      tapSoundRef.current?.setPositionAsync(0).then(() => tapSoundRef.current?.playAsync());
+    }
 
     // Character shake
     Animated.sequence([
@@ -217,20 +251,19 @@ export default function MenuScreen() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>⚙️ 설정</Text>
 
-            <View style={styles.settingItem}>
+            <Pressable style={styles.settingItem} onPress={toggleSfx}>
               <Text style={styles.settingLabel}>🔊 효과음</Text>
-              <Text style={styles.settingValue}>ON</Text>
-            </View>
+              <Text style={[styles.settingValue, sfxEnabled && styles.settingValueOn]}>
+                {sfxEnabled ? "ON" : "OFF"}
+              </Text>
+            </Pressable>
 
-            <View style={styles.settingItem}>
+            <Pressable style={styles.settingItem} onPress={toggleBgm}>
               <Text style={styles.settingLabel}>🎵 배경음악</Text>
-              <Text style={styles.settingValue}>ON</Text>
-            </View>
-
-            <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>📳 진동</Text>
-              <Text style={styles.settingValue}>준비중</Text>
-            </View>
+              <Text style={[styles.settingValue, bgmEnabled && styles.settingValueOn]}>
+                {bgmEnabled ? "ON" : "OFF"}
+              </Text>
+            </Pressable>
 
             <Pressable
               style={styles.modalCloseBtn}
@@ -310,26 +343,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: -60,
-    marginRight: -60,
+    width: SCREEN_WIDTH,
+    maxWidth: 500,
   },
   centerImage: {
-    width: 400,
-    height: 400,
+    width: SCREEN_WIDTH * 0.55,
+    height: SCREEN_WIDTH * 0.55,
+    maxWidth: 280,
+    maxHeight: 280,
     zIndex: 2,
-    marginHorizontal: -80,
+    marginHorizontal: SCREEN_WIDTH * -0.12,
   },
   leftSideImage: {
-    width: 280,
-    height: 280,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.4,
+    maxWidth: 200,
+    maxHeight: 200,
     zIndex: 1,
-    marginRight: -130,
+    marginRight: SCREEN_WIDTH * -0.15,
   },
   rightSideImage: {
-    width: 280,
-    height: 280,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.4,
+    maxWidth: 200,
+    maxHeight: 200,
     zIndex: 1,
-    marginLeft: -130,
+    marginLeft: SCREEN_WIDTH * -0.15,
   },
   title: {
     fontSize: 38,
@@ -431,6 +470,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
+  },
+  settingValueOn: {
+    color: "#4f4",
+    backgroundColor: "#2a4a2a",
   },
   modalCloseBtn: {
     marginTop: 24,

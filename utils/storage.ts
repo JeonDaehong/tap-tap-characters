@@ -8,6 +8,8 @@ const TUTORIAL_KEY = "cat_tap_tutorial";
 const HP_KEY = "cat_tap_hp";
 const ACHIEVEMENTS_KEY = "cat_tap_achievements";
 const HP_ZERO_COUNT_KEY = "cat_tap_hp_zero_count";
+const SFX_ENABLED_KEY = "cat_tap_sfx_enabled";
+const BGM_ENABLED_KEY = "cat_tap_bgm_enabled";
 
 // --- Score ---
 export async function getScore(): Promise<number> {
@@ -145,4 +147,20 @@ export async function incrementHpZeroCount(): Promise<number> {
   const count = (await getHpZeroCount()) + 1;
   await AsyncStorage.setItem(HP_ZERO_COUNT_KEY, count.toString());
   return count;
+}
+
+// --- Sound Settings ---
+export async function getSfxEnabled(): Promise<boolean> {
+  const v = await AsyncStorage.getItem(SFX_ENABLED_KEY);
+  return v !== "false"; // default true
+}
+export async function setSfxEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(SFX_ENABLED_KEY, enabled.toString());
+}
+export async function getBgmEnabled(): Promise<boolean> {
+  const v = await AsyncStorage.getItem(BGM_ENABLED_KEY);
+  return v !== "false"; // default true
+}
+export async function setBgmEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(BGM_ENABLED_KEY, enabled.toString());
 }
