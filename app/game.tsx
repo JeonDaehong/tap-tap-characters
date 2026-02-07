@@ -120,14 +120,17 @@ export default function GameScreen() {
     };
   }, []);
 
-  // Handle Android back button - go to main menu
+  // Handle Android back button - go to main menu (only when no modal is open)
   useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible) {
+        return false; // let default behavior (close modal)
+      }
       router.replace("/");
       return true;
     });
     return () => backHandler.remove();
-  }, [router]);
+  }, [router, gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible]);
 
   // HP regen timer
   useEffect(() => {
