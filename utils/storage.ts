@@ -10,6 +10,10 @@ const ACHIEVEMENTS_KEY = "cat_tap_achievements";
 const HP_ZERO_COUNT_KEY = "cat_tap_hp_zero_count";
 const SFX_ENABLED_KEY = "cat_tap_sfx_enabled";
 const BGM_ENABLED_KEY = "cat_tap_bgm_enabled";
+const ENHANCEMENT_KEY = "cat_tap_enhancement";
+const MEDALS_KEY = "cat_tap_medals";
+const OWNED_SKINS_KEY = "cat_tap_owned_skins";
+const EQUIPPED_SKINS_KEY = "cat_tap_equipped_skins";
 
 // --- Score ---
 export async function getScore(): Promise<number> {
@@ -163,4 +167,94 @@ export async function getBgmEnabled(): Promise<boolean> {
 }
 export async function setBgmEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(BGM_ENABLED_KEY, enabled.toString());
+}
+
+// --- Medals ---
+export async function getMedals(): Promise<number> {
+  const v = await AsyncStorage.getItem(MEDALS_KEY);
+  return v ? parseInt(v, 10) : 0;
+}
+export async function setMedals(medals: number): Promise<void> {
+  await AsyncStorage.setItem(MEDALS_KEY, medals.toString());
+}
+
+// --- Owned Skins ---
+export async function getOwnedSkins(): Promise<string[]> {
+  const v = await AsyncStorage.getItem(OWNED_SKINS_KEY);
+  return v ? JSON.parse(v) : [];
+}
+export async function addOwnedSkin(skinId: string): Promise<string[]> {
+  const skins = await getOwnedSkins();
+  if (!skins.includes(skinId)) {
+    skins.push(skinId);
+    await AsyncStorage.setItem(OWNED_SKINS_KEY, JSON.stringify(skins));
+  }
+  return skins;
+}
+
+// --- Equipped Skins (per cat) ---
+async function getAllEquippedSkins(): Promise<Record<string, string>> {
+  const v = await AsyncStorage.getItem(EQUIPPED_SKINS_KEY);
+  return v ? JSON.parse(v) : {};
+}
+export async function getEquippedSkin(catId: string): Promise<string> {
+  const all = await getAllEquippedSkins();
+  return all[catId] ?? "";
+}
+export async function getAllEquippedSkinsData(): Promise<Record<string, string>> {
+  return getAllEquippedSkins();
+}
+export async function setEquippedSkin(catId: string, skinId: string): Promise<void> {
+  const all = await getAllEquippedSkins();
+  all[catId] = skinId;
+  await AsyncStorage.setItem(EQUIPPED_SKINS_KEY, JSON.stringify(all));
+}
+export async function clearEquippedSkin(catId: string): Promise<void> {
+  const all = await getAllEquippedSkins();
+  delete all[catId];
+  await AsyncStorage.setItem(EQUIPPED_SKINS_KEY, JSON.stringify(all));
+}
+
+// --- Enhancement System ---
+export interface EnhancementData {
+  level: number;      // 0~5강
+  duplicates: number; // 보유 중복 재료 수
+}
+
+async function getAllEnhancements(): Promise<Record<string, EnhancementData>> {
+  const v = await AsyncStorage.getItem(ENHANCEMENT_KEY);
+  return v ? JSON.parse(v) : {};
+}
+
+async function saveAllEnhancements(data: Record<string, EnhancementData>): Promise<void> {
+  await AsyncStorage.setItem(ENHANCEMENT_KEY, JSON.stringify(data));
+}
+
+export async function getCatEnhancement(catId: string): Promise<EnhancementData> {
+  const all = await getAllEnhancements();
+  return all[catId] ?? { level: 0, duplicates: 0 };
+}
+
+export async function getAllCatEnhancements(): Promise<Record<string, EnhancementData>> {
+  return getAllEnhancements();
+}
+
+export async function addCatDuplicate(catId: string): Promise<EnhancementData> {
+  const all = await getAllEnhancements();
+  if (!all[catId]) all[catId] = { level: 0, duplicates: 0 };
+  all[catId].duplicates += 1;
+  await saveAllEnhancements(all);
+  return all[catId];
+}
+
+export async function enhanceCat(catId: string): Promise<EnhancementData | null> {
+  const all = await getAllEnhancements();
+  if (!all[catId]) all[catId] = { level: 0, duplicates: 0 };
+  const data = all[catId];
+  const cost = data.level + 1; // 0→1: 1개, 1→2: 2개, ...
+  if (data.level >= 5 || data.duplicates < cost) return null;
+  data.duplicates -= cost;
+  data.level += 1;
+  await saveAllEnhancements(all);
+  return data;
 }

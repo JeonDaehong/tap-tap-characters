@@ -386,6 +386,25 @@ export const ALL_CATS: CatData[] = [
   },
 ];
 
+export const MAX_ENHANCEMENT = 5;
+
+// 강화 비용: n강→(n+1)강 = (n+1)개 필요
+export function getEnhancementCost(currentLevel: number): number {
+  return currentLevel + 1;
+}
+
+// 강화 적용 스탯 계산
+export function getEnhancedConfig(grade: CatGrade, level: number): GradeConfig {
+  const base = GRADE_CONFIG[grade];
+  if (level <= 0) return base;
+  return {
+    ...base,
+    coinChance: Math.round((base.coinChance + base.coinChance * 0.1 * level) * 100) / 100,
+    critChance: Math.round((base.critChance + base.critChance * 0.1 * level) * 100) / 100,
+    hpLossInterval: base.hpLossInterval + 2 * level,
+  };
+}
+
 export const GACHA_COST = 100;
 
 export function rollGacha(): CatData {

@@ -15,6 +15,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Audio } from "expo-av";
 import CuteCat, { AnimationState } from "../components/CuteCat";
 import GachaModal from "../components/GachaModal";
+import SlotMachineModal from "../components/SlotMachineModal";
+import SkinGachaModal from "../components/SkinGachaModal";
 import FallingParticles from "../components/FallingParticles";
 import HPBar from "../components/HPBar";
 import AchievementModal from "../components/AchievementModal";
@@ -29,7 +31,9 @@ import {
   hasParticleEffect,
   hasCustomBackground,
   hasDarkStormEffect,
+  getEnhancedConfig,
 } from "../data/cats";
+import { SkinData, SkinGachaResult, SKIN_GACHA_COST, getSkinById } from "../data/skins";
 import * as storage from "../utils/storage";
 
 export default function GameScreen() {
@@ -41,6 +45,13 @@ export default function GameScreen() {
   const [selectedCatId, setSelectedCatId] = useState("");
   const [hp, setHp] = useState(100);
   const [tapCount, setTapCount] = useState(0);
+  const [enhanceLevel, setEnhanceLevel] = useState(0);
+  const [medals, setMedals] = useState(0);
+  const [ownedSkins, setOwnedSkins] = useState<string[]>([]);
+  const [equippedSkinId, setEquippedSkinId] = useState("");
+
+  const [slotVisible, setSlotVisible] = useState(false);
+  const [skinGachaVisible, setSkinGachaVisible] = useState(false);
 
   const [particleTrigger, setParticleTrigger] = useState(0);
   const [gachaVisible, setGachaVisible] = useState(false);
@@ -54,6 +65,7 @@ export default function GameScreen() {
   const [darkStorm, setDarkStorm] = useState(false);
   const [gachaMenuVisible, setGachaMenuVisible] = useState(false);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
+  const [insufficientMsg, setInsufficientMsg] = useState("");
 
   const [tutorialDone, setTutorialDone] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기, 3=tap 컬렉션
@@ -120,17 +132,19 @@ export default function GameScreen() {
     };
   }, []);
 
-  // Handle Android back button - go to main menu (only when no modal is open)
+  const [exitModalVisible, setExitModalVisible] = useState(false);
+
+  // Handle Android back button - show exit confirmation
   useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible) {
+      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible) {
         return false; // let default behavior (close modal)
       }
-      router.replace("/");
+      setExitModalVisible(true);
       return true;
     });
     return () => backHandler.remove();
-  }, [router, gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible]);
+  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible]);
 
   // HP regen timer
   useEffect(() => {
@@ -182,7 +196,7 @@ export default function GameScreen() {
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [s, c, sel, co, tut, achList, sfx] = await Promise.all([
+        const [s, c, sel, co, tut, achList, sfx, med, oSkins] = await Promise.all([
           storage.getScore(),
           storage.getCollection(),
           storage.getSelectedCat(),
@@ -190,6 +204,8 @@ export default function GameScreen() {
           storage.getTutorialComplete(),
           storage.getUnlockedAchievements(),
           storage.getSfxEnabled(),
+          storage.getMedals(),
+          storage.getOwnedSkins(),
         ]);
         setScore(s);
         const validIds = new Set(ALL_CATS.map(cat => cat.id));
@@ -199,11 +215,22 @@ export default function GameScreen() {
         setTutorialDone(tut);
         setUnlockedAchievements(achList);
         setSfxEnabled(sfx);
+        setMedals(med);
+        setOwnedSkins(oSkins);
 
         if (sel) {
-          const hpData = await storage.getCatHP(sel);
+          const [hpData, enhData, eqSkin] = await Promise.all([
+            storage.getCatHP(sel),
+            storage.getCatEnhancement(sel),
+            storage.getEquippedSkin(sel),
+          ]);
           setHp(hpData.hp);
           setTapCount(hpData.tapCount);
+          setEnhanceLevel(enhData.level);
+          setEquippedSkinId(eqSkin);
+        } else {
+          setEnhanceLevel(0);
+          setEquippedSkinId("");
         }
 
         // Check score-based achievements on load
@@ -234,7 +261,13 @@ export default function GameScreen() {
   );
 
   const selectedCat = ALL_CATS.find(c => c.id === selectedCatId) ?? null;
-  const gradeConfig = selectedCat ? GRADE_CONFIG[selectedCat.grade] : GRADE_CONFIG["C"];
+  const gradeConfig = selectedCat ? getEnhancedConfig(selectedCat.grade, enhanceLevel) : GRADE_CONFIG["C"];
+
+  // Determine if a skin is equipped and resolve frames
+  const equippedSkin = equippedSkinId ? getSkinById(equippedSkinId) : null;
+  const useSkin = !!(equippedSkin && selectedCat && equippedSkin.catId === selectedCat.id);
+  // Apply skin coinChance bonus
+  const skinCoinBonus = useSkin ? equippedSkin!.coinChanceBonus : 0;
 
   const handleTutorialGachaButton = useCallback(() => {
     if (tutorialStep === 1) {
@@ -282,8 +315,8 @@ export default function GameScreen() {
     setScore(newScore);
     storage.setScore(newScore);
 
-    // coinChance: C=1 → 10%, B=1.1 → 11%, ... SSS=3 → 30%
-    if (Math.random() < gradeConfig.coinChance * 0.1) {
+    // coinChance: C=1 → 10%, B=1.1 → 11%, ... SSS=3 → 30% + skin bonus
+    if (Math.random() < (gradeConfig.coinChance + skinCoinBonus) * 0.1) {
       const newCoins = coins + 1;
       setCoins(newCoins);
       storage.setCoins(newCoins);
@@ -435,7 +468,7 @@ export default function GameScreen() {
         useNativeDriver: true,
       }).start();
     }
-  }, [score, coins, hp, tapCount, bounceAnim, flinchAnim, animationState, selectedCat, gradeConfig, tryUnlock, sfxEnabled]);
+  }, [score, coins, hp, tapCount, bounceAnim, flinchAnim, animationState, selectedCat, gradeConfig, tryUnlock, sfxEnabled, skinCoinBonus]);
 
   const handleGacha = useCallback(async () => {
     if (coins < GACHA_COST) return;
@@ -449,6 +482,9 @@ export default function GameScreen() {
       const newCollection = await storage.addToCollection(result.id);
       setCollection(newCollection);
       await storage.initCatHP(result.id);
+    } else {
+      // Duplicate → add as enhancement material
+      await storage.addCatDuplicate(result.id);
     }
 
     setGachaResult(result);
@@ -464,6 +500,29 @@ export default function GameScreen() {
   const handleGachaClose = useCallback(async () => {
     setGachaVisible(false);
   }, []);
+
+  const handleSlotResult = useCallback(async (medalCount: number) => {
+    const newCoins = coins - 1000;
+    setCoins(newCoins);
+    await storage.setCoins(newCoins);
+    const newMedals = medals + medalCount;
+    setMedals(newMedals);
+    await storage.setMedals(newMedals);
+  }, [coins, medals]);
+
+  const handleSkinGachaPull = useCallback(async (skin: SkinData, result: SkinGachaResult) => {
+    let newMedals = medals - SKIN_GACHA_COST;
+    if (result.type === "skin") {
+      const newSkins = await storage.addOwnedSkin(skin.id);
+      setOwnedSkins(newSkins);
+    } else if (result.type === "full_refund") {
+      newMedals += SKIN_GACHA_COST;
+    } else if (result.type === "half_refund") {
+      newMedals += Math.floor(SKIN_GACHA_COST / 2);
+    }
+    setMedals(newMedals);
+    await storage.setMedals(newMedals);
+  }, [medals]);
 
   const handleTutorialStart = useCallback(async (cat: CatData) => {
     const newCoins = coins - GACHA_COST;
@@ -489,14 +548,22 @@ export default function GameScreen() {
   const bgColor = selectedCat && hasCustomBackground(selectedCat.grade) && selectedCat.backgroundColor
     ? selectedCat.backgroundColor
     : "#16213e";
-  const isHurtOrCollapsed = selectedCat && ((animationState === "collapsed" && selectedCat.collapsedFrame) || (animationState === "hurt" && selectedCat.hurtFrames));
-  const catImgSource = selectedCat?.danceFrames
-    ? (animationState === "collapsed" && selectedCat.collapsedFrame
-        ? selectedCat.collapsedFrame
-        : animationState === "hurt" && selectedCat.hurtFrames
-          ? selectedCat.hurtFrames[danceFrame % selectedCat.hurtFrames.length]
-          : selectedCat.danceFrames[danceFrame % selectedCat.danceFrames.length])
-    : null;
+
+  const isHurtOrCollapsed = selectedCat && ((animationState === "collapsed" && (useSkin ? equippedSkin!.collapsedFrame : selectedCat.collapsedFrame)) || (animationState === "hurt" && (useSkin ? equippedSkin!.hurtFrames : selectedCat.hurtFrames)));
+
+  const catImgSource = (() => {
+    if (!selectedCat) return null;
+    if (useSkin && equippedSkin) {
+      if (animationState === "collapsed") return equippedSkin.collapsedFrame;
+      if (animationState === "hurt") return equippedSkin.hurtFrames[danceFrame % equippedSkin.hurtFrames.length];
+      return equippedSkin.danceFrames[danceFrame % equippedSkin.danceFrames.length];
+    }
+    if (!selectedCat.danceFrames) return null;
+    if (animationState === "collapsed" && selectedCat.collapsedFrame) return selectedCat.collapsedFrame;
+    if (animationState === "hurt" && selectedCat.hurtFrames) return selectedCat.hurtFrames[danceFrame % selectedCat.hurtFrames.length];
+    return selectedCat.danceFrames[danceFrame % selectedCat.danceFrames.length];
+  })();
+
   const catImgScale = isHurtOrCollapsed ? 2.5 : 2.5;
 
   return (
@@ -539,6 +606,7 @@ export default function GameScreen() {
         </View>
         <View style={styles.topRight}>
           <Text style={styles.coinText}>💰 {coins}</Text>
+          <Text style={styles.medalText}>👑 {medals}</Text>
         </View>
       </View>
 
@@ -705,13 +773,19 @@ export default function GameScreen() {
             )}
 
             <Pressable
-              onPress={tutorialStep === 2 ? handleTutorialNormalGacha : () => { setGachaMenuVisible(false); handleGacha(); }}
+              onPress={tutorialStep === 2 ? handleTutorialNormalGacha : () => {
+                if (coins < GACHA_COST) {
+                  setGachaMenuVisible(false);
+                  setInsufficientMsg(`코인이 부족합니다!\n필요: 💰 ${GACHA_COST} / 보유: 💰 ${coins}`);
+                  return;
+                }
+                setGachaMenuVisible(false);
+                handleGacha();
+              }}
               style={[
                 styles.gachaMenuItem,
-                coins < GACHA_COST && tutorialStep === 0 && styles.gachaMenuItemDisabled,
                 tutorialStep === 2 && styles.gachaMenuItemHighlight
               ]}
-              disabled={coins < GACHA_COST && tutorialStep === 0}
             >
               <Text style={styles.gachaMenuEmoji}>🎁</Text>
               <Text style={styles.gachaMenuText}>일반 뽑기</Text>
@@ -719,23 +793,36 @@ export default function GameScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => { setGachaMenuVisible(false); setComingSoonVisible(true); }}
+              onPress={() => {
+                if (tutorialStep === 2) return;
+                if (coins < 1000) {
+                  setGachaMenuVisible(false);
+                  setInsufficientMsg(`코인이 부족합니다!\n필요: 💰 1000 / 보유: 💰 ${coins}`);
+                  return;
+                }
+                setGachaMenuVisible(false);
+                setSlotVisible(true);
+              }}
               style={[styles.gachaMenuItem, tutorialStep === 2 && styles.gachaMenuItemDisabledTutorial]}
               disabled={tutorialStep === 2}
             >
-              <Text style={styles.gachaMenuEmoji}>✨</Text>
-              <Text style={styles.gachaMenuText}>특수 뽑기</Text>
-              <Text style={styles.gachaMenuSoon}>SOON</Text>
+              <Text style={styles.gachaMenuEmoji}>👑</Text>
+              <Text style={styles.gachaMenuText}>황금왕관 뽑기</Text>
+              <Text style={styles.gachaMenuCost}>💰 1000</Text>
             </Pressable>
 
             <Pressable
-              onPress={() => { setGachaMenuVisible(false); setComingSoonVisible(true); }}
+              onPress={() => {
+                if (tutorialStep === 2) return;
+                setGachaMenuVisible(false);
+                setSkinGachaVisible(true);
+              }}
               style={[styles.gachaMenuItem, tutorialStep === 2 && styles.gachaMenuItemDisabledTutorial]}
               disabled={tutorialStep === 2}
             >
               <Text style={styles.gachaMenuEmoji}>👗</Text>
-              <Text style={styles.gachaMenuText}>코스튬 뽑기</Text>
-              <Text style={styles.gachaMenuSoon}>SOON</Text>
+              <Text style={styles.gachaMenuText}>스킨 뽑기</Text>
+              <Text style={styles.gachaMenuCost}>👑 100</Text>
             </Pressable>
 
             {tutorialStep === 0 && (
@@ -760,6 +847,22 @@ export default function GameScreen() {
         visible={achievementModalVisible}
         unlocked={unlockedAchievements}
         onClose={() => setAchievementModalVisible(false)}
+      />
+
+      <SlotMachineModal
+        visible={slotVisible}
+        onClose={() => setSlotVisible(false)}
+        onResult={handleSlotResult}
+        coins={coins}
+      />
+
+      <SkinGachaModal
+        visible={skinGachaVisible}
+        onClose={() => setSkinGachaVisible(false)}
+        medals={medals}
+        collection={collection}
+        ownedSkins={ownedSkins}
+        onPull={handleSkinGachaPull}
       />
 
       <AchievementCelebration
@@ -802,6 +905,49 @@ export default function GameScreen() {
             <Pressable onPress={() => setComingSoonVisible(false)} style={styles.comingSoonBtn}>
               <Text style={styles.comingSoonBtnText}>확인</Text>
             </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Insufficient Funds Modal */}
+      <Modal
+        visible={!!insufficientMsg}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInsufficientMsg("")}
+      >
+        <Pressable style={styles.comingSoonOverlay} onPress={() => setInsufficientMsg("")}>
+          <View style={styles.comingSoonBox}>
+            <Text style={styles.comingSoonEmoji}>💸</Text>
+            <Text style={styles.comingSoonTitle}>잔액 부족</Text>
+            <Text style={styles.comingSoonDesc}>{insufficientMsg}</Text>
+            <Pressable onPress={() => setInsufficientMsg("")} style={styles.comingSoonBtn}>
+              <Text style={styles.comingSoonBtnText}>확인</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Exit Confirmation Modal */}
+      <Modal
+        visible={exitModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExitModalVisible(false)}
+      >
+        <Pressable style={styles.comingSoonOverlay} onPress={() => setExitModalVisible(false)}>
+          <View style={styles.comingSoonBox}>
+            <Text style={styles.comingSoonEmoji}>🚪</Text>
+            <Text style={styles.comingSoonTitle}>종료</Text>
+            <Text style={styles.comingSoonDesc}>정말 게임을 종료하시겠습니까?</Text>
+            <View style={styles.exitButtons}>
+              <Pressable onPress={() => setExitModalVisible(false)} style={styles.exitBtnCancel}>
+                <Text style={styles.comingSoonBtnText}>취소</Text>
+              </Pressable>
+              <Pressable onPress={() => { setExitModalVisible(false); router.replace("/"); }} style={styles.exitBtnConfirm}>
+                <Text style={styles.comingSoonBtnText}>종료</Text>
+              </Pressable>
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -850,6 +996,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FFA500",
     fontWeight: "bold",
+  },
+  medalText: {
+    fontSize: 13,
+    color: "#FFD700",
+    fontWeight: "bold",
+    marginTop: 2,
   },
   gradeBadge: {
     paddingHorizontal: 14,
@@ -1245,5 +1397,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     marginTop: 4,
+  },
+  exitButtons: {
+    flexDirection: "row" as const,
+    gap: 16,
+    marginTop: 20,
+  },
+  exitBtnCancel: {
+    backgroundColor: "#444",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  exitBtnConfirm: {
+    backgroundColor: "#a33",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
   },
 });

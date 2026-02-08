@@ -306,7 +306,7 @@ export default function GachaModal({
               {isNew ? (
                 <Text style={styles.newBadge}>✨ NEW!</Text>
               ) : (
-                <Text style={styles.dupeBadge}>이미 보유 중</Text>
+                <Text style={styles.dupeBadge}>⚔️ 승급 재료 +1</Text>
               )}
 
               {forced && onTutorialStart ? (
@@ -401,8 +401,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   dupeBadge: {
-    fontSize: 14,
-    color: "#888",
+    fontSize: 16,
+    color: "#FFA500",
+    fontWeight: "bold",
     marginTop: 10,
   },
   closeButton: {
