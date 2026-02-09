@@ -66,4 +66,10 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     description: "게임을 처음 시작하기",
     icon: "🎉",
   },
+  {
+    id: "skin_1",
+    title: "패션의 완성!",
+    description: "스킨 1개 이상 획득하기",
+    icon: "👗",
+  },
 ];

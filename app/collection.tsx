@@ -72,6 +72,7 @@ export default function CollectionScreen() {
   const [ownedSkins, setOwnedSkins] = useState<string[]>([]);
   const [equippedSkins, setEquippedSkins] = useState<Record<string, string>>({});
   const [detailTab, setDetailTab] = useState<"enhance" | "skin">("enhance");
+  const [zoomImage, setZoomImage] = useState<any>(null);
 
   // Enhancement animation
   const [enhancing, setEnhancing] = useState(false);
@@ -353,7 +354,11 @@ export default function CollectionScreen() {
                       const eqSkin = eqSkinId ? getSkinById(eqSkinId) : null;
                       const imgSource = eqSkin ? eqSkin.detailImage : detailCat.thumbnail;
                       if (imgSource) {
-                        return <Image source={imgSource} style={{ width: 160, height: 160 }} resizeMode="contain" />;
+                        return (
+                          <Pressable onPress={() => setZoomImage(imgSource)}>
+                            <Image source={imgSource} style={{ width: 160, height: 160 }} resizeMode="contain" />
+                          </Pressable>
+                        );
                       }
                       return <CuteCat colors={detailCat.colors} size={140} />;
                     })()}
@@ -564,6 +569,16 @@ export default function CollectionScreen() {
             })()}
           </View>
         </View>
+      </Modal>
+
+      {/* Zoom image modal */}
+      <Modal transparent visible={!!zoomImage} animationType="fade">
+        <Pressable style={styles.zoomOverlay} onPress={() => setZoomImage(null)}>
+          <Image source={zoomImage} style={styles.zoomImage} resizeMode="contain" />
+          <Pressable style={styles.zoomCloseBtn} onPress={() => setZoomImage(null)}>
+            <Text style={styles.zoomCloseBtnText}>✕ 닫기</Text>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -905,5 +920,31 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 6,
+  },
+
+  // Zoom image modal
+  zoomOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  zoomImage: {
+    width: "85%",
+    height: "65%",
+  },
+  zoomCloseBtn: {
+    marginTop: 24,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+  },
+  zoomCloseBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });

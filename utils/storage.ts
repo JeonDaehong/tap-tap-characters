@@ -215,6 +215,23 @@ export async function clearEquippedSkin(catId: string): Promise<void> {
   await AsyncStorage.setItem(EQUIPPED_SKINS_KEY, JSON.stringify(all));
 }
 
+// --- Mini-game Daily Reset ---
+const MINIGAME_KEY = "cat_tap_minigame";
+
+function getTodayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export async function getMinigamePlayed(gameId: string): Promise<boolean> {
+  const v = await AsyncStorage.getItem(`${MINIGAME_KEY}_${gameId}`);
+  return v === getTodayStr();
+}
+
+export async function setMinigamePlayed(gameId: string): Promise<void> {
+  await AsyncStorage.setItem(`${MINIGAME_KEY}_${gameId}`, getTodayStr());
+}
+
 // --- Enhancement System ---
 export interface EnhancementData {
   level: number;      // 0~5강

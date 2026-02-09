@@ -34,6 +34,9 @@ import {
   getEnhancedConfig,
 } from "../data/cats";
 import { SkinData, SkinGachaResult, SKIN_GACHA_COST, getSkinById } from "../data/skins";
+import MemoryGameModal from "../components/MemoryGameModal";
+import FortuneModal from "../components/FortuneModal";
+import SlimeDodgeModal from "../components/SlimeDodgeModal";
 import * as storage from "../utils/storage";
 
 export default function GameScreen() {
@@ -66,6 +69,10 @@ export default function GameScreen() {
   const [gachaMenuVisible, setGachaMenuVisible] = useState(false);
   const [comingSoonVisible, setComingSoonVisible] = useState(false);
   const [insufficientMsg, setInsufficientMsg] = useState("");
+  const [miniGameMenuVisible, setMiniGameMenuVisible] = useState(false);
+  const [memoryGameVisible, setMemoryGameVisible] = useState(false);
+  const [fortuneVisible, setFortuneVisible] = useState(false);
+  const [slimeDodgeVisible, setSlimeDodgeVisible] = useState(false);
 
   const [tutorialDone, setTutorialDone] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기, 3=tap 컬렉션
@@ -85,7 +92,12 @@ export default function GameScreen() {
   const critSoundRef = useRef<Audio.Sound | null>(null);
   const darkSoundRef = useRef<Audio.Sound | null>(null);
   const darkCritSoundRef = useRef<Audio.Sound | null>(null);
-  const holyFlashOpacity = useRef(new Animated.Value(0)).current;
+  const holyAuraScale = useRef(new Animated.Value(0.3)).current;
+  const holyAuraOpacity = useRef(new Animated.Value(0)).current;
+  const holyAura2Scale = useRef(new Animated.Value(0.2)).current;
+  const holyAura2Opacity = useRef(new Animated.Value(0)).current;
+  const holyRingRotation = useRef(new Animated.Value(0)).current;
+  const holyRingOpacity = useRef(new Animated.Value(0)).current;
   const darkStormOpacity = useRef(new Animated.Value(0)).current;
   const auraScale = useRef(new Animated.Value(0)).current;
   const auraOpacity = useRef(new Animated.Value(0)).current;
@@ -137,14 +149,14 @@ export default function GameScreen() {
   // Handle Android back button - show exit confirmation
   useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible) {
-        return false; // let default behavior (close modal)
+      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible || miniGameMenuVisible || memoryGameVisible || fortuneVisible || slimeDodgeVisible) {
+        return false;
       }
       setExitModalVisible(true);
       return true;
     });
     return () => backHandler.remove();
-  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible]);
+  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible, miniGameMenuVisible, memoryGameVisible, fortuneVisible, slimeDodgeVisible]);
 
   // HP regen timer
   useEffect(() => {
@@ -329,10 +341,18 @@ export default function GameScreen() {
       ]).start(() => setCoinPopup(false));
     }
 
-    const activeFrames =
-      animationState === "collapsed" ? 1
-      : animationState === "hurt" && selectedCat.hurtFrames ? selectedCat.hurtFrames.length
-      : selectedCat.danceFrames?.length ?? gradeConfig.danceFrames;
+    // Use skin frame counts when skin is active
+    const activeFrames = (() => {
+      if (animationState === "collapsed") return 1;
+      if (useSkin && equippedSkin) {
+        return animationState === "hurt"
+          ? equippedSkin.hurtFrames.length
+          : equippedSkin.danceFrames.length;
+      }
+      return animationState === "hurt" && selectedCat.hurtFrames
+        ? selectedCat.hurtFrames.length
+        : selectedCat.danceFrames?.length ?? gradeConfig.danceFrames;
+    })();
     setDanceFrame(prev => (prev + 1) % activeFrames);
 
     const newTapCount = tapCount + 1;
@@ -362,11 +382,39 @@ export default function GameScreen() {
       setParticleTrigger(prev => prev + 1);
     }
 
-    // S+ grade holy flash effect
-    if (hasCustomBackground(selectedCat.grade)) {
+    // S grade holy aura effect (not SSS - SSS has its own dark storm)
+    if (hasCustomBackground(selectedCat.grade) && !hasDarkStormEffect(selectedCat.grade)) {
       setHolyFlash(true);
-      holyFlashOpacity.setValue(0.6);
-      Animated.timing(holyFlashOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => setHolyFlash(false));
+
+      // Inner glow burst
+      holyAuraScale.setValue(0.3);
+      holyAuraOpacity.setValue(0.8);
+
+      // Outer glow ring
+      holyAura2Scale.setValue(0.2);
+      holyAura2Opacity.setValue(0.6);
+
+      // Spinning ring
+      holyRingOpacity.setValue(0.7);
+      holyRingRotation.setValue(0);
+
+      Animated.parallel([
+        // Inner glow expand & fade
+        Animated.spring(holyAuraScale, { toValue: 1.8, friction: 5, tension: 80, useNativeDriver: true }),
+        Animated.timing(holyAuraOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        // Outer glow expand & fade (delayed)
+        Animated.sequence([
+          Animated.delay(60),
+          Animated.spring(holyAura2Scale, { toValue: 2.2, friction: 4, tension: 60, useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.delay(60),
+          Animated.timing(holyAura2Opacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ]),
+        // Spinning ring
+        Animated.timing(holyRingRotation, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(holyRingOpacity, { toValue: 0, duration: 600, useNativeDriver: true }),
+      ]).start(() => setHolyFlash(false));
     }
 
     // SSS grade dark storm + multi-layer aura effect
@@ -515,6 +563,7 @@ export default function GameScreen() {
     if (result.type === "skin") {
       const newSkins = await storage.addOwnedSkin(skin.id);
       setOwnedSkins(newSkins);
+      if (newSkins.length >= 1) tryUnlock("skin_1");
     } else if (result.type === "full_refund") {
       newMedals += SKIN_GACHA_COST;
     } else if (result.type === "half_refund") {
@@ -522,7 +571,14 @@ export default function GameScreen() {
     }
     setMedals(newMedals);
     await storage.setMedals(newMedals);
-  }, [medals]);
+  }, [medals, tryUnlock]);
+
+  const handleMiniGameReward = useCallback(async (reward: number) => {
+    if (reward <= 0) return;
+    const newCoins = coins + reward;
+    setCoins(newCoins);
+    await storage.setCoins(newCoins);
+  }, [coins]);
 
   const handleTutorialStart = useCallback(async (cat: CatData) => {
     const newCoins = coins - GACHA_COST;
@@ -572,12 +628,7 @@ export default function GameScreen() {
         <FallingParticles trigger={particleTrigger} emoji={selectedCat.particleEmoji} />
       )}
 
-      {holyFlash && (
-        <Animated.View
-          style={[StyleSheet.absoluteFill, { backgroundColor: "#FFD700", opacity: holyFlashOpacity, zIndex: 50 }]}
-          pointerEvents="none"
-        />
-      )}
+      {/* holyFlash aura is rendered inside catContainer */}
 
       {darkStorm && (
         <Animated.View
@@ -632,6 +683,35 @@ export default function GameScreen() {
       {/* Cat */}
       <Pressable onPress={handleTap} style={styles.catArea}>
         <View style={styles.catContainer}>
+          {/* S grade Holy Aura effects */}
+          {selectedCat && holyFlash && hasCustomBackground(selectedCat.grade) && !hasDarkStormEffect(selectedCat.grade) && (
+            <>
+              {/* Outer soft glow */}
+              <Animated.View
+                style={[styles.holyAura2, {
+                  opacity: holyAura2Opacity,
+                  transform: [{ scale: holyAura2Scale }],
+                }]}
+                pointerEvents="none"
+              />
+              {/* Inner bright glow */}
+              <Animated.View
+                style={[styles.holyAura, {
+                  opacity: holyAuraOpacity,
+                  transform: [{ scale: holyAuraScale }],
+                }]}
+                pointerEvents="none"
+              />
+              {/* Spinning ring */}
+              <Animated.View
+                style={[styles.holyRing, {
+                  opacity: holyRingOpacity,
+                  transform: [{ rotate: holyRingRotation.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "180deg"] }) }],
+                }]}
+                pointerEvents="none"
+              />
+            </>
+          )}
           {/* SSS Multi-layer Aura effects */}
           {selectedCat && darkStorm && hasDarkStormEffect(selectedCat.grade) && (
             <>
@@ -746,12 +826,12 @@ export default function GameScreen() {
         </Pressable>
 
         <Pressable
-          onPress={() => setComingSoonVisible(true)}
+          onPress={() => setMiniGameMenuVisible(true)}
           style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
           disabled={tutorialStep > 0}
         >
-          <Text style={styles.bottomBtnEmoji}>🏆</Text>
-          <Text style={styles.bottomBtnLabel}>랭킹</Text>
+          <Text style={styles.bottomBtnEmoji}>🎮</Text>
+          <Text style={styles.bottomBtnLabel}>미니게임</Text>
         </Pressable>
       </View>
 
@@ -863,6 +943,68 @@ export default function GameScreen() {
         collection={collection}
         ownedSkins={ownedSkins}
         onPull={handleSkinGachaPull}
+      />
+
+      {/* Mini-game Menu Modal */}
+      <Modal
+        visible={miniGameMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMiniGameMenuVisible(false)}
+      >
+        <Pressable style={styles.gachaOverlay} onPress={() => setMiniGameMenuVisible(false)}>
+          <View style={styles.gachaMenu}>
+            <Text style={styles.gachaMenuTitle}>미니게임</Text>
+
+            <Pressable
+              onPress={() => { setMiniGameMenuVisible(false); setMemoryGameVisible(true); }}
+              style={styles.gachaMenuItem}
+            >
+              <Text style={styles.gachaMenuEmoji}>🃏</Text>
+              <Text style={styles.gachaMenuText}>기억력 게임</Text>
+              <Text style={styles.gachaMenuCost}>1일 1회</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setMiniGameMenuVisible(false); setFortuneVisible(true); }}
+              style={styles.gachaMenuItem}
+            >
+              <Text style={styles.gachaMenuEmoji}>🔮</Text>
+              <Text style={styles.gachaMenuText}>오늘의 운세</Text>
+              <Text style={styles.gachaMenuCost}>1일 1회</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { setMiniGameMenuVisible(false); setSlimeDodgeVisible(true); }}
+              style={styles.gachaMenuItem}
+            >
+              <Text style={styles.gachaMenuEmoji}>🟢</Text>
+              <Text style={styles.gachaMenuText}>슬라임 피하기</Text>
+              <Text style={styles.gachaMenuCost}>1일 1회</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setMiniGameMenuVisible(false)} style={styles.gachaMenuClose}>
+              <Text style={styles.gachaMenuCloseText}>닫기</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Mini-game Modals */}
+      <MemoryGameModal
+        visible={memoryGameVisible}
+        onClose={() => setMemoryGameVisible(false)}
+        onReward={handleMiniGameReward}
+      />
+      <FortuneModal
+        visible={fortuneVisible}
+        onClose={() => setFortuneVisible(false)}
+        onReward={handleMiniGameReward}
+      />
+      <SlimeDodgeModal
+        visible={slimeDodgeVisible}
+        onClose={() => setSlimeDodgeVisible(false)}
+        onReward={handleMiniGameReward}
       />
 
       <AchievementCelebration
@@ -1243,6 +1385,43 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 60,
+  },
+  holyAura: {
+    position: "absolute" as const,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: "rgba(135, 206, 250, 0.25)",
+    borderWidth: 3,
+    borderColor: "rgba(173, 216, 230, 0.7)",
+    shadowColor: "#87CEFA",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 35,
+  },
+  holyAura2: {
+    position: "absolute" as const,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: "rgba(200, 230, 255, 0.15)",
+    borderWidth: 2,
+    borderColor: "rgba(135, 206, 250, 0.4)",
+    shadowColor: "#B0E0E6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 50,
+  },
+  holyRing: {
+    position: "absolute" as const,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: "transparent",
+    borderWidth: 3,
+    borderColor: "transparent",
+    borderTopColor: "rgba(255, 255, 255, 0.8)",
+    borderBottomColor: "rgba(173, 216, 230, 0.6)",
   },
   emptyCharacter: {
     width: 200,

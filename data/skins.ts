@@ -39,10 +39,6 @@ export const ALL_SKINS: SkinData[] = [
       require("../assets/img/y_skin_10.png"),
       require("../assets/img/y_skin_11.png"),
       require("../assets/img/y_skin_12.png"),
-      require("../assets/img/y_skin_13.png"),
-      require("../assets/img/y_skin_14.png"),
-      require("../assets/img/y_skin_21.png"),
-      require("../assets/img/y_skin_22.png"),
     ],
     hurtFrames: [
       require("../assets/img/y_skin_15.png"),
@@ -52,6 +48,37 @@ export const ALL_SKINS: SkinData[] = [
       require("../assets/img/y_skin_19.png"),
     ],
     collapsedFrame: require("../assets/img/y_skin_20.png"),
+  },
+  {
+    id: "tonya_drunk",
+    name: "술 주정뱅이 토냐",
+    description: "오늘도 한 잔... 아니 열 잔. 취해도 암살 실력은 여전하다.",
+    catId: "tonya",
+    medalCost: 100,
+    dropRate: 0.10,       // 10%
+    coinChanceBonus: 0.1, // +1%
+    thumbnail: require("../assets/img/b_skin_1.png"),
+    detailImage: require("../assets/img/b_skin_100.png"),
+    danceFrames: [
+      require("../assets/img/b_skin_1.png"),
+      require("../assets/img/b_skin_2.png"),
+      require("../assets/img/b_skin_3.png"),
+      require("../assets/img/b_skin_4.png"),
+      require("../assets/img/b_skin_5.png"),
+      require("../assets/img/b_skin_6.png"),
+      require("../assets/img/b_skin_7.png"),
+      require("../assets/img/b_skin_8.png"),
+      require("../assets/img/b_skin_9.png"),
+      require("../assets/img/b_skin_10.png"),
+    ],
+    hurtFrames: [
+      require("../assets/img/b_skin_11.png"),
+      require("../assets/img/b_skin_12.png"),
+      require("../assets/img/b_skin_13.png"),
+      require("../assets/img/b_skin_14.png"),
+      require("../assets/img/b_skin_15.png"),
+    ],
+    collapsedFrame: require("../assets/img/b_skin_16.png"),
   },
 ];
 

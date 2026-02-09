@@ -34,9 +34,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "23515465-6389-4f24-a3ce-858227b96943"
+        "projectId": "e5078459-33c7-4219-acb2-b4329fba0174"
       }
     },
-    "owner": "daehong"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "jeondaehong"
   }
 }
