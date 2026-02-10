@@ -229,7 +229,7 @@ export default function SlotMachineModal({
           </View>
 
           {/* Close */}
-          {phase !== "spinning" && (
+          {phase === "idle" && (
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>닫기</Text>
             </Pressable>
