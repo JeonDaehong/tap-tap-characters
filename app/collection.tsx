@@ -73,6 +73,7 @@ export default function CollectionScreen() {
   const [equippedSkins, setEquippedSkins] = useState<Record<string, string>>({});
   const [detailTab, setDetailTab] = useState<"enhance" | "skin">("enhance");
   const [zoomImage, setZoomImage] = useState<any>(null);
+  const [expeditionCatIds, setExpeditionCatIds] = useState<Set<string>>(new Set());
 
   // Enhancement animation
   const [enhancing, setEnhancing] = useState(false);
@@ -103,6 +104,16 @@ export default function CollectionScreen() {
         setOwnedSkins(oSkins);
         setEquippedSkins(eqSkins);
 
+        // Load expedition cats
+        const expeditions = await storage.getExpeditions();
+        const expCats = new Set(
+          expeditions
+            .filter(s => s.status === "active" || s.status === "complete")
+            .map(s => s.catId)
+            .filter(Boolean)
+        );
+        setExpeditionCatIds(expCats);
+
         if (!tut && savedStep === 3 && savedCatId) {
           setTutorialStep(4);
           setTutorialCatId(savedCatId);
@@ -126,6 +137,7 @@ export default function CollectionScreen() {
 
   const handleEquip = async () => {
     if (!detailCat) return;
+    if (expeditionCatIds.has(detailCat.id)) return; // 원정 중 교체 불가
     setSelectedCatId(detailCat.id);
     await storage.setSelectedCat(detailCat.id);
     setDetailCat(null);
@@ -541,7 +553,11 @@ export default function CollectionScreen() {
                   })()}
 
                   <View style={styles.detailButtons}>
-                    {isEquipped ? (
+                    {expeditionCatIds.has(detailCat.id) ? (
+                      <View style={styles.equippedBadge}>
+                        <Text style={[styles.equippedText, { color: "#e94560" }]}>⚔️ 원정 중</Text>
+                      </View>
+                    ) : isEquipped ? (
                       <View style={styles.equippedBadge}>
                         <Text style={styles.equippedText}>사용 중</Text>
                       </View>

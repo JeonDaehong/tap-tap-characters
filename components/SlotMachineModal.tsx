@@ -17,7 +17,7 @@ interface SlotMachineModalProps {
   coins: number;
 }
 
-const SLOT_COST = 1000;
+const SLOT_COST = 100;
 
 export default function SlotMachineModal({
   visible,

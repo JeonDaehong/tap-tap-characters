@@ -28,7 +28,8 @@ export default function Layout() {
         <Stack.Screen
           name="collection"
           options={{
-            title: "컬렉션",
+            headerShown: true,
+            headerTitle: "",
             presentation: "modal",
           }}
         />

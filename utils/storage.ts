@@ -232,6 +232,118 @@ export async function setMinigamePlayed(gameId: string): Promise<void> {
   await AsyncStorage.setItem(`${MINIGAME_KEY}_${gameId}`, getTodayStr());
 }
 
+// --- Expedition System ---
+const EXPEDITION_KEY = "cat_tap_expedition";
+
+export interface ExpeditionSlot {
+  catId: string;
+  startTime: number;   // timestamp ms
+  duration: number;     // duration ms
+  baseReward: number;
+  status: "idle" | "active" | "complete";
+}
+
+export async function getExpeditions(): Promise<ExpeditionSlot[]> {
+  const v = await AsyncStorage.getItem(EXPEDITION_KEY);
+  const slots: ExpeditionSlot[] = v ? JSON.parse(v) : [
+    { catId: "", startTime: 0, duration: 0, baseReward: 0, status: "idle" },
+    { catId: "", startTime: 0, duration: 0, baseReward: 0, status: "idle" },
+    { catId: "", startTime: 0, duration: 0, baseReward: 0, status: "idle" },
+  ];
+  // Auto-complete expired expeditions
+  const now = Date.now();
+  for (const slot of slots) {
+    if (slot.status === "active" && now >= slot.startTime + slot.duration) {
+      slot.status = "complete";
+    }
+  }
+  await AsyncStorage.setItem(EXPEDITION_KEY, JSON.stringify(slots));
+  return slots;
+}
+
+export async function setExpeditions(slots: ExpeditionSlot[]): Promise<void> {
+  await AsyncStorage.setItem(EXPEDITION_KEY, JSON.stringify(slots));
+}
+
+// --- Quest System ---
+const QUEST_KEY = "cat_tap_quest";
+
+export interface QuestProgress {
+  // daily
+  dailyTaps: number;
+  dailyGachaPulls: number;
+  dailyMinigames: number;
+  dailyCoinsEarned: number;
+  dailyClaimed: boolean[];
+  dailyDate: string;
+  // weekly
+  weeklyTaps: number;
+  weeklyGachaPulls: number;
+  weeklyEnhancements: number;
+  weeklyMinigames: number;
+  weeklyClaimed: boolean[];
+  weeklyStartDate: string;
+}
+
+export const DEFAULT_QUEST_PROGRESS: QuestProgress = {
+  dailyTaps: 0,
+  dailyGachaPulls: 0,
+  dailyMinigames: 0,
+  dailyCoinsEarned: 0,
+  dailyClaimed: [false, false, false, false, false],
+  dailyDate: "",
+  weeklyTaps: 0,
+  weeklyGachaPulls: 0,
+  weeklyEnhancements: 0,
+  weeklyMinigames: 0,
+  weeklyClaimed: [false, false, false, false, false],
+  weeklyStartDate: "",
+};
+
+function getWeekStartStr(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  const monday = new Date(d.setDate(diff));
+  return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+}
+
+export async function getQuestProgress(): Promise<QuestProgress> {
+  const v = await AsyncStorage.getItem(QUEST_KEY);
+  let q: QuestProgress = v ? JSON.parse(v) : { ...DEFAULT_QUEST_PROGRESS };
+  const today = getTodayStr();
+  const weekStart = getWeekStartStr();
+  let changed = false;
+  // Reset daily if date changed
+  if (q.dailyDate !== today) {
+    q.dailyTaps = 0;
+    q.dailyGachaPulls = 0;
+    q.dailyMinigames = 0;
+    q.dailyCoinsEarned = 0;
+    q.dailyClaimed = [false, false, false, false, false];
+    q.dailyDate = today;
+    changed = true;
+  }
+  // Reset weekly if week changed
+  if (q.weeklyStartDate !== weekStart) {
+    q.weeklyTaps = 0;
+    q.weeklyGachaPulls = 0;
+    q.weeklyEnhancements = 0;
+    q.weeklyMinigames = 0;
+    q.weeklyClaimed = [false, false, false, false, false];
+    q.weeklyStartDate = weekStart;
+    changed = true;
+  }
+  if (changed) {
+    await AsyncStorage.setItem(QUEST_KEY, JSON.stringify(q));
+  }
+  return q;
+}
+
+export async function setQuestProgress(q: QuestProgress): Promise<void> {
+  await AsyncStorage.setItem(QUEST_KEY, JSON.stringify(q));
+}
+
 // --- Enhancement System ---
 export interface EnhancementData {
   level: number;      // 0~5강
