@@ -38,6 +38,10 @@ import MemoryGameModal from "../components/MemoryGameModal";
 import FortuneModal from "../components/FortuneModal";
 import ExpeditionModal from "../components/ExpeditionModal";
 import QuestModal from "../components/QuestModal";
+import RankingModal from "../components/RankingModal";
+import BossBattleModal from "../components/BossBattleModal";
+import AttendanceModal from "../components/AttendanceModal";
+import AffinityModal from "../components/AffinityModal";
 import * as storage from "../utils/storage";
 
 export default function GameScreen() {
@@ -75,6 +79,11 @@ export default function GameScreen() {
   const [fortuneVisible, setFortuneVisible] = useState(false);
   const [expeditionVisible, setExpeditionVisible] = useState(false);
   const [questVisible, setQuestVisible] = useState(false);
+  const [rankingVisible, setRankingVisible] = useState(false);
+  const [bossVisible, setBossVisible] = useState(false);
+  const [attendanceVisible, setAttendanceVisible] = useState(false);
+  const [moreMenuVisible, setMoreMenuVisible] = useState(false);
+  const [affinityVisible, setAffinityVisible] = useState(false);
   const [questProgress, setQuestProgress] = useState<storage.QuestProgress>(storage.DEFAULT_QUEST_PROGRESS);
   const [enhancements, setEnhancements] = useState<Record<string, storage.EnhancementData>>({});
 
@@ -153,14 +162,14 @@ export default function GameScreen() {
   // Handle Android back button - show exit confirmation
   useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible || miniGameMenuVisible || memoryGameVisible || fortuneVisible || expeditionVisible || questVisible) {
+      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible || miniGameMenuVisible || memoryGameVisible || fortuneVisible || expeditionVisible || questVisible || rankingVisible || bossVisible || attendanceVisible || moreMenuVisible || affinityVisible) {
         return false;
       }
       setExitModalVisible(true);
       return true;
     });
     return () => backHandler.remove();
-  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible, miniGameMenuVisible, memoryGameVisible, fortuneVisible, expeditionVisible, questVisible]);
+  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible, miniGameMenuVisible, memoryGameVisible, fortuneVisible, expeditionVisible, questVisible, rankingVisible, bossVisible, attendanceVisible, moreMenuVisible, affinityVisible]);
 
   // HP regen timer
   useEffect(() => {
@@ -264,6 +273,14 @@ export default function GameScreen() {
         if (co >= 1000) tryUnlock("coins_1000");
         if (c.length >= 10) tryUnlock("collect_10");
         if (c.some(id => ALL_CATS.find(cat => cat.id === id)?.grade === "SSS")) tryUnlock("sss_pull");
+
+        // Show attendance popup if not claimed today
+        if (tut) {
+          const attendance = await storage.getAttendance();
+          if (!attendance.claimedToday) {
+            setAttendanceVisible(true);
+          }
+        }
 
         if (!tut) {
           // Check if tutorial is mid-progress (e.g. came back from collection)
@@ -402,6 +419,16 @@ export default function GameScreen() {
       storage.setQuestProgress(updated);
       return updated;
     });
+
+    // Affinity XP: +1 per tap when seraph is equipped
+    if (selectedCat.id === "seraph") {
+      storage.getAffinity("seraph").then((data) => {
+        if (data.level < 10) {
+          const updated = storage.addAffinityXp(data, 1);
+          storage.setAffinity("seraph", updated);
+        }
+      });
+    }
 
     if (hasParticleEffect(selectedCat.grade) && selectedCat.particleEmoji) {
       setParticleTrigger(prev => prev + 1);
@@ -647,6 +674,32 @@ export default function GameScreen() {
     }
   }, [coins, medals]);
 
+  const handleAttendanceReward = useCallback(async (rewardCoins: number, rewardMedals: number) => {
+    if (rewardCoins > 0) {
+      const newCoins = coins + rewardCoins;
+      setCoins(newCoins);
+      await storage.setCoins(newCoins);
+    }
+    if (rewardMedals > 0) {
+      const newMedals = medals + rewardMedals;
+      setMedals(newMedals);
+      await storage.setMedals(newMedals);
+    }
+  }, [coins, medals]);
+
+  const handleBossReward = useCallback(async (rewardCoins: number, rewardMedals: number) => {
+    if (rewardCoins > 0) {
+      const newCoins = coins + rewardCoins;
+      setCoins(newCoins);
+      await storage.setCoins(newCoins);
+    }
+    if (rewardMedals > 0) {
+      const newMedals = medals + rewardMedals;
+      setMedals(newMedals);
+      await storage.setMedals(newMedals);
+    }
+  }, [coins, medals]);
+
   const handleClaimQuest = useCallback(async (questType: "daily" | "weekly", index: number) => {
     setQuestProgress((prev: storage.QuestProgress) => {
       const updated = { ...prev };
@@ -870,100 +923,99 @@ export default function GameScreen() {
         </View>
       )}
 
-      {/* Bottom game buttons - 2x3 grid */}
-      <View style={[styles.bottomPanel, tutorialStep > 0 && { zIndex: 60 }]}>
-        <View style={styles.bottomRow}>
-          <View style={[styles.bottomBtnWrap, tutorialStep === 3 && styles.tutorialBtnElevated]}>
-            {tutorialStep === 3 && (
-              <View style={[styles.tutorialHint, { left: 0 }]}>
-                <Text style={styles.tutorialHintText}>👇 캐릭터를 장착하세요!</Text>
-              </View>
-            )}
-            <Pressable
-              onPress={() => router.push("/collection")}
-              style={[styles.bottomBtn, tutorialStep > 0 && tutorialStep !== 3 && styles.bottomBtnDisabled, tutorialStep === 3 && styles.bottomBtnHighlight]}
-              disabled={tutorialStep > 0 && tutorialStep !== 3}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(100,130,255,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>📚</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>컬렉션</Text>
-            </Pressable>
-          </View>
-
-          <View style={[styles.bottomBtnWrap, tutorialStep === 1 && styles.tutorialBtnElevated]}>
-            {tutorialStep === 1 && (
-              <View style={styles.tutorialHint}>
-                <Text style={styles.tutorialHintText}>👇 여기를 눌러주세요!</Text>
-              </View>
-            )}
-            <Pressable
-              onPress={tutorialStep === 1 ? handleTutorialGachaButton : () => setGachaMenuVisible(true)}
-              style={[styles.bottomBtn, tutorialStep === 1 && styles.bottomBtnHighlight, tutorialStep > 0 && tutorialStep !== 1 && styles.bottomBtnDisabled]}
-              disabled={tutorialStep > 0 && tutorialStep !== 1}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(255,100,100,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>🎁</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>뽑기</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.bottomBtnWrap}>
-            <Pressable
-              onPress={() => setMiniGameMenuVisible(true)}
-              style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
-              disabled={tutorialStep > 0}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(100,255,150,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>🎮</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>미니게임</Text>
-            </Pressable>
-          </View>
+      {/* Bottom nav bar - 4 fixed buttons */}
+      <View style={[styles.bottomBar, tutorialStep > 0 && { zIndex: 60 }]}>
+        <View style={[tutorialStep === 3 && styles.tutorialBtnElevated, { overflow: "visible", flex: 1 }]}>
+          {tutorialStep === 3 && (
+            <View style={[styles.tutorialHint, { left: -10 }]}>
+              <Text style={styles.tutorialHintText}>👇 캐릭터를 장착하세요!</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={() => router.push("/collection")}
+            style={[styles.bottomTab, tutorialStep > 0 && tutorialStep !== 3 && styles.bottomBtnDisabled, tutorialStep === 3 && styles.bottomBtnHighlight]}
+            disabled={tutorialStep > 0 && tutorialStep !== 3}
+          >
+            <Text style={styles.bottomTabEmoji}>📚</Text>
+            <Text style={styles.bottomTabLabel}>컬렉션</Text>
+          </Pressable>
         </View>
 
-        <View style={styles.bottomRow}>
-          <View style={styles.bottomBtnWrap}>
-            <Pressable
-              onPress={() => setExpeditionVisible(true)}
-              style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
-              disabled={tutorialStep > 0}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(255,180,50,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>⚔️</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>원정대</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.bottomBtnWrap}>
-            <Pressable
-              onPress={() => setQuestVisible(true)}
-              style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
-              disabled={tutorialStep > 0}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(180,100,255,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>📋</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>과제</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.bottomBtnWrap}>
-            <Pressable
-              onPress={() => setAchievementModalVisible(true)}
-              style={[styles.bottomBtn, tutorialStep > 0 && styles.bottomBtnDisabled]}
-              disabled={tutorialStep > 0}
-            >
-              <View style={[styles.bottomBtnIcon, { backgroundColor: "rgba(255,215,0,0.25)" }]}>
-                <Text style={styles.bottomBtnEmoji}>🏅</Text>
-              </View>
-              <Text style={styles.bottomBtnLabel}>업적</Text>
-            </Pressable>
-          </View>
+        <View style={[tutorialStep === 1 && styles.tutorialBtnElevated, { overflow: "visible", flex: 1 }]}>
+          {tutorialStep === 1 && (
+            <View style={styles.tutorialHint}>
+              <Text style={styles.tutorialHintText}>👇 여기를 눌러주세요!</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={tutorialStep === 1 ? handleTutorialGachaButton : () => setGachaMenuVisible(true)}
+            style={[styles.bottomTab, tutorialStep === 1 && styles.bottomBtnHighlight, tutorialStep > 0 && tutorialStep !== 1 && styles.bottomBtnDisabled]}
+            disabled={tutorialStep > 0 && tutorialStep !== 1}
+          >
+            <Text style={styles.bottomTabEmoji}>🎁</Text>
+            <Text style={styles.bottomTabLabel}>뽑기</Text>
+          </Pressable>
         </View>
+
+        <Pressable onPress={() => setRankingVisible(true)} style={[styles.bottomTab, { flex: 1 }, tutorialStep > 0 && styles.bottomBtnDisabled]} disabled={tutorialStep > 0}>
+          <Text style={styles.bottomTabEmoji}>🏆</Text>
+          <Text style={styles.bottomTabLabel}>랭킹</Text>
+        </Pressable>
+
+        <Pressable onPress={() => setMoreMenuVisible(true)} style={[styles.bottomTab, { flex: 1 }, tutorialStep > 0 && styles.bottomBtnDisabled]} disabled={tutorialStep > 0}>
+          <Text style={styles.bottomTabEmoji}>📋</Text>
+          <Text style={styles.bottomTabLabel}>메뉴</Text>
+        </Pressable>
       </View>
+
+      {/* More menu modal */}
+      <Modal visible={moreMenuVisible} transparent animationType="fade" onRequestClose={() => setMoreMenuVisible(false)}>
+        <Pressable style={styles.gachaOverlay} onPress={() => setMoreMenuVisible(false)}>
+          <View style={styles.gachaMenu} onStartShouldSetResponder={() => true}>
+            <Text style={styles.gachaMenuTitle}>메뉴</Text>
+            <View style={styles.menuDivider} />
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setMiniGameMenuVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>🎮</Text>
+              <Text style={styles.gachaMenuText}>미니게임</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setExpeditionVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>⚔️</Text>
+              <Text style={styles.gachaMenuText}>원정대</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setBossVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>🐉</Text>
+              <Text style={styles.gachaMenuText}>보스 도전</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setQuestVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>📋</Text>
+              <Text style={styles.gachaMenuText}>과제</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAchievementModalVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>🏅</Text>
+              <Text style={styles.gachaMenuText}>업적</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAttendanceVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>📅</Text>
+              <Text style={styles.gachaMenuText}>출석 체크</Text>
+            </Pressable>
+
+            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAffinityVisible(true); }}>
+              <Text style={styles.gachaMenuEmoji}>💕</Text>
+              <Text style={styles.gachaMenuText}>애정도</Text>
+            </Pressable>
+
+            <Pressable onPress={() => setMoreMenuVisible(false)} style={styles.gachaMenuClose}>
+              <Text style={styles.gachaMenuCloseText}>닫기</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Gacha sub-menu modal */}
       <Modal
@@ -1138,6 +1190,29 @@ export default function GameScreen() {
         onReward={handleQuestReward}
         onClaimQuest={handleClaimQuest}
         questProgress={questProgress}
+      />
+      <RankingModal
+        visible={rankingVisible}
+        onClose={() => setRankingVisible(false)}
+        score={score}
+        collection={collection}
+      />
+      <BossBattleModal
+        visible={bossVisible}
+        onClose={() => setBossVisible(false)}
+        onReward={handleBossReward}
+        selectedGrade={selectedCat?.grade ?? null}
+        enhanceLevel={enhanceLevel}
+      />
+      <AttendanceModal
+        visible={attendanceVisible}
+        onClose={() => setAttendanceVisible(false)}
+        onReward={handleAttendanceReward}
+      />
+      <AffinityModal
+        visible={affinityVisible}
+        onClose={() => setAffinityVisible(false)}
+        catId="seraph"
       />
       <AchievementCelebration
         achievement={celebratingAchievement}
@@ -1351,50 +1426,30 @@ const styles = StyleSheet.create({
     height: 70,
     marginTop: 8,
   },
-  bottomPanel: {
+  bottomBar: {
     width: "100%",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingBottom: 14,
-    backgroundColor: "rgba(10,10,30,0.85)",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "rgba(100,120,255,0.15)",
-    gap: 6,
-    overflow: "visible",
-  },
-  bottomRow: {
     flexDirection: "row",
-    gap: 8,
-  },
-  bottomBtnWrap: {
-    flex: 1,
+    backgroundColor: "rgba(10,10,30,0.95)",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+    borderColor: "rgba(100,120,255,0.15)",
+    paddingVertical: 6,
+    paddingBottom: 10,
+    paddingHorizontal: 4,
     overflow: "visible",
   },
-  bottomBtn: {
-    flex: 1,
-    backgroundColor: "rgba(35,35,70,0.9)",
-    paddingVertical: 10,
-    borderRadius: 14,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(80,80,140,0.4)",
-  },
-  bottomBtnIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  bottomTab: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  bottomTabEmoji: {
+    fontSize: 22,
     marginBottom: 3,
   },
-  bottomBtnEmoji: {
-    fontSize: 18,
-  },
-  bottomBtnLabel: {
+  bottomTabLabel: {
     color: "rgba(255,255,255,0.85)",
     fontSize: 11,
     fontWeight: "bold",

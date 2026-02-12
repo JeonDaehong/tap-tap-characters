@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Pressable,
   StyleSheet,
   SectionList,
+  ScrollView,
   Animated,
   Easing,
+  BackHandler,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import CuteCat from "../components/CuteCat";
@@ -82,6 +84,19 @@ export default function CollectionScreen() {
   const enhScale = useRef(new Animated.Value(1)).current;
   const enhStarScale = useRef(new Animated.Value(0)).current;
   const enhStarOpacity = useRef(new Animated.Value(0)).current;
+
+  // Hardware back button → go back to game
+  useEffect(() => {
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (detailCat) {
+        setDetailCat(null);
+        return true;
+      }
+      router.back();
+      return true;
+    });
+    return () => handler.remove();
+  }, [detailCat, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -317,6 +332,7 @@ export default function CollectionScreen() {
       {/* Detail Modal */}
       <Modal transparent visible={!!detailCat} animationType="fade">
         <View style={styles.overlay}>
+          <ScrollView contentContainerStyle={styles.detailScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.detailModal}>
             {detailCat && (() => {
               const enh = enhancements[detailCat.id] ?? { level: 0, duplicates: 0 };
@@ -584,6 +600,7 @@ export default function CollectionScreen() {
               );
             })()}
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -658,7 +675,13 @@ const styles = StyleSheet.create({
   unknown: { color: "#555", fontSize: 14, marginTop: 8 },
   selectedLabel: { color: "#FFD700", fontSize: 10, marginTop: 4 },
 
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", justifyContent: "center", alignItems: "center" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)" },
+  detailScroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
   detailModal: {
     backgroundColor: "#1a1a2e",
     borderRadius: 20,

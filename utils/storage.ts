@@ -344,6 +344,148 @@ export async function setQuestProgress(q: QuestProgress): Promise<void> {
   await AsyncStorage.setItem(QUEST_KEY, JSON.stringify(q));
 }
 
+// --- Attendance System ---
+const ATTENDANCE_KEY = "cat_tap_attendance";
+
+export interface AttendanceData {
+  lastLoginDate: string;
+  consecutiveDays: number;
+  totalDays: number;
+  claimedToday: boolean;
+}
+
+export async function getAttendance(): Promise<AttendanceData> {
+  const v = await AsyncStorage.getItem(ATTENDANCE_KEY);
+  const data: AttendanceData = v ? JSON.parse(v) : {
+    lastLoginDate: "",
+    consecutiveDays: 0,
+    totalDays: 0,
+    claimedToday: false,
+  };
+  const today = getTodayStr();
+  if (data.lastLoginDate !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+    if (data.lastLoginDate === yStr) {
+      data.consecutiveDays += 1;
+    } else if (data.lastLoginDate !== "") {
+      data.consecutiveDays = 1;
+    } else {
+      data.consecutiveDays = 1;
+    }
+    data.claimedToday = false;
+  }
+  return data;
+}
+
+export async function claimAttendance(): Promise<AttendanceData> {
+  const data = await getAttendance();
+  data.lastLoginDate = getTodayStr();
+  data.totalDays += 1;
+  data.claimedToday = true;
+  await AsyncStorage.setItem(ATTENDANCE_KEY, JSON.stringify(data));
+  return data;
+}
+
+// --- Boss Battle ---
+const BOSS_KEY = "cat_tap_boss";
+
+export interface BossData {
+  lastPlayDate: string;
+  highestStage: number;
+  playsToday: number;
+}
+
+export async function getBossData(): Promise<BossData> {
+  const v = await AsyncStorage.getItem(BOSS_KEY);
+  const data: BossData = v ? JSON.parse(v) : {
+    lastPlayDate: "",
+    highestStage: 0,
+    playsToday: 0,
+  };
+  const today = getTodayStr();
+  if (data.lastPlayDate !== today) {
+    data.playsToday = 0;
+    data.lastPlayDate = today;
+  }
+  return data;
+}
+
+export async function setBossData(data: BossData): Promise<void> {
+  await AsyncStorage.setItem(BOSS_KEY, JSON.stringify(data));
+}
+
+// --- Ranking ---
+const RANKING_KEY = "cat_tap_ranking";
+
+export interface RankingData {
+  totalTaps: number;
+  weeklyScore: number;
+  weekStartDate: string;
+}
+
+export async function getRanking(): Promise<RankingData> {
+  const v = await AsyncStorage.getItem(RANKING_KEY);
+  const data: RankingData = v ? JSON.parse(v) : {
+    totalTaps: 0,
+    weeklyScore: 0,
+    weekStartDate: "",
+  };
+  const weekStart = getWeekStartStr();
+  if (data.weekStartDate !== weekStart) {
+    data.weeklyScore = 0;
+    data.weekStartDate = weekStart;
+  }
+  return data;
+}
+
+export async function setRanking(data: RankingData): Promise<void> {
+  await AsyncStorage.setItem(RANKING_KEY, JSON.stringify(data));
+}
+
+// --- Affinity System ---
+const AFFINITY_KEY = "cat_tap_affinity";
+
+export interface AffinityData {
+  level: number;       // 0~10
+  xp: number;          // current XP within level
+  readChapters: number[]; // chapters already read (1-5)
+  unlockedSpecial: boolean; // y_story_100 viewed
+}
+
+const AFFINITY_XP_TABLE = [0, 10, 30, 60, 100, 150, 220, 300, 400, 520]; // XP needed for level 1→2, 2→3, ...10
+
+export async function getAffinity(catId: string): Promise<AffinityData> {
+  const v = await AsyncStorage.getItem(`${AFFINITY_KEY}_${catId}`);
+  return v ? JSON.parse(v) : { level: 0, xp: 0, readChapters: [], unlockedSpecial: false };
+}
+
+export async function setAffinity(catId: string, data: AffinityData): Promise<void> {
+  await AsyncStorage.setItem(`${AFFINITY_KEY}_${catId}`, JSON.stringify(data));
+}
+
+export function addAffinityXp(data: AffinityData, amount: number): AffinityData {
+  if (data.level >= 10) return data;
+  const updated = { ...data, xp: data.xp + amount, readChapters: [...data.readChapters] };
+  while (updated.level < 10) {
+    const needed = AFFINITY_XP_TABLE[updated.level];
+    if (updated.xp >= needed) {
+      updated.xp -= needed;
+      updated.level += 1;
+    } else {
+      break;
+    }
+  }
+  if (updated.level >= 10) updated.xp = 0;
+  return updated;
+}
+
+export function getAffinityXpNeeded(level: number): number {
+  if (level >= 10) return 0;
+  return AFFINITY_XP_TABLE[level];
+}
+
 // --- Enhancement System ---
 export interface EnhancementData {
   level: number;      // 0~5강

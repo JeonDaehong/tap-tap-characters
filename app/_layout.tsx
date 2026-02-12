@@ -30,7 +30,6 @@ export default function Layout() {
           options={{
             headerShown: true,
             headerTitle: "",
-            presentation: "modal",
           }}
         />
       </Stack>
