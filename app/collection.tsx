@@ -25,7 +25,10 @@ import {
   MAX_ENHANCEMENT,
 } from "../data/cats";
 import { getSkinByCatId, getSkinById, SkinData } from "../data/skins";
+import AffinityModal from "../components/AffinityModal";
 import * as storage from "../utils/storage";
+
+const AFFINITY_CATS = new Set(["seraph"]);
 
 interface Section {
   title: string;
@@ -76,6 +79,8 @@ export default function CollectionScreen() {
   const [detailTab, setDetailTab] = useState<"enhance" | "skin">("enhance");
   const [zoomImage, setZoomImage] = useState<any>(null);
   const [expeditionCatIds, setExpeditionCatIds] = useState<Set<string>>(new Set());
+  const [affinityVisible, setAffinityVisible] = useState(false);
+  const [affinityCatId, setAffinityCatId] = useState("");
 
   // Enhancement animation
   const [enhancing, setEnhancing] = useState(false);
@@ -88,6 +93,10 @@ export default function CollectionScreen() {
   // Hardware back button → go back to game
   useEffect(() => {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (affinityVisible) {
+        setAffinityVisible(false);
+        return true;
+      }
       if (detailCat) {
         setDetailCat(null);
         return true;
@@ -96,7 +105,7 @@ export default function CollectionScreen() {
       return true;
     });
     return () => handler.remove();
-  }, [detailCat, router]);
+  }, [detailCat, affinityVisible, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,6 +157,16 @@ export default function CollectionScreen() {
     if (tutorialStep === 4) {
       setTutorialStep(5);
     }
+  };
+
+  const handleAffinityReward = async (coins: number) => {
+    const current = await storage.getCoins();
+    await storage.setCoins(current + coins);
+  };
+
+  const openAffinity = (catId: string) => {
+    setAffinityCatId(catId);
+    setAffinityVisible(true);
   };
 
   const handleEquip = async () => {
@@ -568,6 +587,14 @@ export default function CollectionScreen() {
                     );
                   })()}
 
+                  {/* Affinity button */}
+                  {AFFINITY_CATS.has(detailCat.id) && tutorialStep === 0 && (
+                    <Pressable style={styles.affinityBtn} onPress={() => openAffinity(detailCat.id)}>
+                      <Text style={styles.affinityBtnEmoji}>💕</Text>
+                      <Text style={styles.affinityBtnText}>애정도</Text>
+                    </Pressable>
+                  )}
+
                   <View style={styles.detailButtons}>
                     {expeditionCatIds.has(detailCat.id) ? (
                       <View style={styles.equippedBadge}>
@@ -603,6 +630,15 @@ export default function CollectionScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Affinity modal */}
+      <AffinityModal
+        visible={affinityVisible}
+        onClose={() => setAffinityVisible(false)}
+        catId={affinityCatId}
+        catName={ALL_CATS.find(c => c.id === affinityCatId)?.name}
+        onReward={handleAffinityReward}
+      />
 
       {/* Zoom image modal */}
       <Modal transparent visible={!!zoomImage} animationType="fade">
@@ -984,6 +1020,30 @@ const styles = StyleSheet.create({
   zoomCloseBtnText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  // Affinity button
+  affinityBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,100,150,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,100,150,0.3)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 12,
+    width: "100%",
+    gap: 8,
+  },
+  affinityBtnEmoji: {
+    fontSize: 18,
+  },
+  affinityBtnText: {
+    color: "#FF69B4",
+    fontSize: 15,
     fontWeight: "bold",
   },
 });

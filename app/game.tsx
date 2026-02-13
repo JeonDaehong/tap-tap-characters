@@ -41,7 +41,6 @@ import QuestModal from "../components/QuestModal";
 import RankingModal from "../components/RankingModal";
 import BossBattleModal from "../components/BossBattleModal";
 import AttendanceModal from "../components/AttendanceModal";
-import AffinityModal from "../components/AffinityModal";
 import * as storage from "../utils/storage";
 
 export default function GameScreen() {
@@ -83,7 +82,6 @@ export default function GameScreen() {
   const [bossVisible, setBossVisible] = useState(false);
   const [attendanceVisible, setAttendanceVisible] = useState(false);
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
-  const [affinityVisible, setAffinityVisible] = useState(false);
   const [questProgress, setQuestProgress] = useState<storage.QuestProgress>(storage.DEFAULT_QUEST_PROGRESS);
   const [enhancements, setEnhancements] = useState<Record<string, storage.EnhancementData>>({});
 
@@ -162,14 +160,14 @@ export default function GameScreen() {
   // Handle Android back button - show exit confirmation
   useEffect(() => {
     const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible || miniGameMenuVisible || memoryGameVisible || fortuneVisible || expeditionVisible || questVisible || rankingVisible || bossVisible || attendanceVisible || moreMenuVisible || affinityVisible) {
+      if (gachaVisible || gachaMenuVisible || achievementModalVisible || comingSoonVisible || slotVisible || skinGachaVisible || miniGameMenuVisible || memoryGameVisible || fortuneVisible || expeditionVisible || questVisible || rankingVisible || bossVisible || attendanceVisible || moreMenuVisible) {
         return false;
       }
       setExitModalVisible(true);
       return true;
     });
     return () => backHandler.remove();
-  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible, miniGameMenuVisible, memoryGameVisible, fortuneVisible, expeditionVisible, questVisible, rankingVisible, bossVisible, attendanceVisible, moreMenuVisible, affinityVisible]);
+  }, [gachaVisible, gachaMenuVisible, achievementModalVisible, comingSoonVisible, slotVisible, skinGachaVisible, miniGameMenuVisible, memoryGameVisible, fortuneVisible, expeditionVisible, questVisible, rankingVisible, bossVisible, attendanceVisible, moreMenuVisible]);
 
   // HP regen timer
   useEffect(() => {
@@ -1005,11 +1003,6 @@ export default function GameScreen() {
               <Text style={styles.gachaMenuText}>출석 체크</Text>
             </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAffinityVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>💕</Text>
-              <Text style={styles.gachaMenuText}>애정도</Text>
-            </Pressable>
-
             <Pressable onPress={() => setMoreMenuVisible(false)} style={styles.gachaMenuClose}>
               <Text style={styles.gachaMenuCloseText}>닫기</Text>
             </Pressable>
@@ -1208,11 +1201,6 @@ export default function GameScreen() {
         visible={attendanceVisible}
         onClose={() => setAttendanceVisible(false)}
         onReward={handleAttendanceReward}
-      />
-      <AffinityModal
-        visible={affinityVisible}
-        onClose={() => setAffinityVisible(false)}
-        catId="seraph"
       />
       <AchievementCelebration
         achievement={celebratingAchievement}

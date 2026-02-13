@@ -5,6 +5,8 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  ScrollView,
+  Dimensions,
 } from "react-native";
 import * as storage from "../utils/storage";
 
@@ -58,6 +60,7 @@ export default function AttendanceModal({ visible, onClose, onReward }: Props) {
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
         <View style={s.container} onStartShouldSetResponder={() => true}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
           <Text style={s.title}>📅 출석 보상</Text>
           <View style={s.divider} />
 
@@ -118,6 +121,7 @@ export default function AttendanceModal({ visible, onClose, onReward }: Props) {
           <Pressable onPress={onClose} style={s.closeBtn}>
             <Text style={s.closeBtnText}>닫기</Text>
           </Pressable>
+          </ScrollView>
         </View>
       </Pressable>
     </Modal>
@@ -134,12 +138,15 @@ const s = StyleSheet.create({
   container: {
     backgroundColor: "#1a1a2e",
     borderRadius: 22,
-    padding: 20,
     width: "90%",
     maxWidth: 380,
-    alignItems: "center",
+    maxHeight: Dimensions.get("window").height * 0.85,
     borderWidth: 1,
     borderColor: "rgba(100,120,255,0.2)",
+  },
+  scrollContent: {
+    padding: 20,
+    alignItems: "center",
   },
   title: {
     color: "#fff",

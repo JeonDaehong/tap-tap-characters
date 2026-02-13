@@ -6,6 +6,8 @@ import {
   Pressable,
   StyleSheet,
   Animated,
+  ScrollView,
+  Dimensions,
 } from "react-native";
 import * as storage from "../utils/storage";
 import { CatGrade } from "../data/cats";
@@ -176,6 +178,7 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
       <Pressable style={s.overlay} onPress={phase === "battle" ? undefined : handleClose}>
         <View style={s.container} onStartShouldSetResponder={() => true}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
           {phase === "select" && (
             <>
               <Text style={s.title}>⚔️ 보스 도전</Text>
@@ -277,6 +280,7 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
               </Pressable>
             </>
           )}
+          </ScrollView>
         </View>
       </Pressable>
     </Modal>
@@ -293,12 +297,15 @@ const s = StyleSheet.create({
   container: {
     backgroundColor: "#1a1a2e",
     borderRadius: 22,
-    padding: 22,
     width: "88%",
     maxWidth: 380,
-    alignItems: "center",
+    maxHeight: Dimensions.get("window").height * 0.85,
     borderWidth: 1,
     borderColor: "rgba(100,120,255,0.2)",
+  },
+  scrollContent: {
+    padding: 22,
+    alignItems: "center",
   },
   title: {
     color: "#fff",

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  FlatList,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ALL_CATS, GRADE_CONFIG, CatData, CatGrade } from "../data/cats";
@@ -572,7 +571,11 @@ export default function ExpeditionModal({
 
       case "selectCharacter":
         return (
-          <View style={styles.phaseContainer}>
+          <ScrollView
+            style={styles.scrollBody}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.phaseTitle}>캐릭터 선택</Text>
             <Text style={styles.phaseSub}>
               슬롯 {phase.slotIndex + 1}에 배치할 캐릭터를 선택하세요
@@ -584,14 +587,11 @@ export default function ExpeditionModal({
                 </Text>
               </View>
             ) : (
-              <FlatList
-                data={availableCats}
-                keyExtractor={(item) => item.id}
-                renderItem={renderCharacterItem}
-                style={styles.charList}
-                contentContainerStyle={styles.charListContent}
-                showsVerticalScrollIndicator={false}
-              />
+              availableCats.map((item) => (
+                <React.Fragment key={item.id}>
+                  {renderCharacterItem({ item })}
+                </React.Fragment>
+              ))
             )}
             <TouchableOpacity
               style={styles.backButton}
@@ -600,13 +600,17 @@ export default function ExpeditionModal({
             >
               <Text style={styles.backButtonText}>돌아가기</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         );
 
       case "selectDuration": {
         const selectedCat = getCatById(phase.catId);
         return (
-          <View style={styles.phaseContainer}>
+          <ScrollView
+            style={styles.scrollBody}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.phaseTitle}>원정 시간 선택</Text>
             {selectedCat && (
               <Text style={styles.phaseSub}>
@@ -628,7 +632,7 @@ export default function ExpeditionModal({
             >
               <Text style={styles.backButtonText}>돌아가기</Text>
             </TouchableOpacity>
-          </View>
+          </ScrollView>
         );
       }
 
@@ -702,6 +706,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFD700",
     overflow: "hidden",
+    flexDirection: "column",
   },
 
   // Header

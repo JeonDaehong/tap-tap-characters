@@ -18,6 +18,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   catId: string;
+  catName?: string;
+  onReward?: (coins: number) => void;
 }
 
 interface ChapterData {
@@ -106,7 +108,9 @@ const CHAPTERS: ChapterData[] = [
   },
 ];
 
-export default function AffinityModal({ visible, onClose, catId }: Props) {
+const CHAPTER_REWARDS: Record<number, number> = { 1: 100, 2: 100, 3: 100, 4: 100, 5: 500 };
+
+export default function AffinityModal({ visible, onClose, catId, catName, onReward }: Props) {
   const [affinity, setAffinityState] = useState<storage.AffinityData>({
     level: 0, xp: 0, readChapters: [], unlockedSpecial: false,
   });
@@ -147,22 +151,29 @@ export default function AffinityModal({ visible, onClose, catId }: Props) {
     animateText();
   }, [animateIn, animateText]);
 
+  const [rewardPopup, setRewardPopup] = useState<number | null>(null);
+
   const handleStoryTap = useCallback(async () => {
     if (!currentChapter) return;
     if (paragraphIdx < currentChapter.paragraphs.length - 1) {
       setParagraphIdx((p) => p + 1);
       animateText();
     } else {
-      // Mark chapter as read
+      // Mark chapter as read & give reward
       const updated = { ...affinity, readChapters: [...affinity.readChapters] };
-      if (!updated.readChapters.includes(currentChapter.chapter)) {
+      const isFirstRead = !updated.readChapters.includes(currentChapter.chapter);
+      if (isFirstRead) {
         updated.readChapters.push(currentChapter.chapter);
         await storage.setAffinity(catId, updated);
         setAffinityState(updated);
+        const reward = CHAPTER_REWARDS[currentChapter.chapter] ?? 100;
+        onReward?.(reward);
+        setRewardPopup(reward);
+        setTimeout(() => setRewardPopup(null), 2500);
       }
       setPhase("main");
     }
-  }, [currentChapter, paragraphIdx, affinity, catId, animateText]);
+  }, [currentChapter, paragraphIdx, affinity, catId, animateText, onReward]);
 
   const handleUnlockSpecial = useCallback(async () => {
     if (affinity.level >= 10 && !affinity.unlockedSpecial) {
@@ -223,7 +234,12 @@ export default function AffinityModal({ visible, onClose, catId }: Props) {
       <Pressable style={s.overlay} onPress={onClose}>
         <View style={s.container} onStartShouldSetResponder={() => true}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
-            <Text style={s.title}>💕 세라피 애정도</Text>
+            {rewardPopup !== null && (
+              <View style={s.rewardPopup}>
+                <Text style={s.rewardPopupText}>💰 +{rewardPopup} 골드 획득!</Text>
+              </View>
+            )}
+            <Text style={s.title}>💕 {catName ?? "세라피"} 애정도</Text>
             <View style={s.divider} />
 
             {/* Affinity level */}
@@ -240,7 +256,7 @@ export default function AffinityModal({ visible, onClose, catId }: Props) {
               ) : (
                 <Text style={s.xpTextMax}>MAX</Text>
               )}
-              <Text style={s.xpHint}>세라피를 장착하고 탭하면 애정도가 올라요!</Text>
+              <Text style={s.xpHint}>{catName ?? "세라피"}를 장착하고 탭하면 애정도가 올라요!</Text>
             </View>
 
             {/* Chapter list */}
@@ -599,5 +615,20 @@ const s = StyleSheet.create({
     color: "rgba(255,255,255,0.5)",
     fontSize: 14,
     fontWeight: "bold",
+  },
+  rewardPopup: {
+    backgroundColor: "rgba(255,165,0,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255,165,0,0.4)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  rewardPopupText: {
+    color: "#FFD700",
+    fontSize: 15,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
