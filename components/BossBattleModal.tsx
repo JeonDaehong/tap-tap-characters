@@ -30,9 +30,11 @@ interface BossStage {
 }
 
 const BOSS_STAGES: BossStage[] = [
-  { name: "고블린 대장", emoji: "👺", hp: 100, timeLimit: 30, rewardCoins: 100, rewardMedals: 0 },
-  { name: "오우거 킹", emoji: "👹", hp: 250, timeLimit: 25, rewardCoins: 200, rewardMedals: 5 },
-  { name: "드래곤 로드", emoji: "🐉", hp: 500, timeLimit: 20, rewardCoins: 400, rewardMedals: 15 },
+  { name: "고블린 대장", emoji: "👺", hp: 250, timeLimit: 30, rewardCoins: 100, rewardMedals: 0 },
+  { name: "오우거 킹", emoji: "👹", hp: 625, timeLimit: 25, rewardCoins: 200, rewardMedals: 5 },
+  { name: "드래곤 로드", emoji: "🐉", hp: 1250, timeLimit: 20, rewardCoins: 400, rewardMedals: 15 },
+  { name: "타이탄 제왕", emoji: "⚡", hp: 3750, timeLimit: 18, rewardCoins: 800, rewardMedals: 30 },
+  { name: "신계의 지배자", emoji: "🌟", hp: 11250, timeLimit: 15, rewardCoins: 1600, rewardMedals: 60 },
 ];
 
 const GRADE_DAMAGE: Record<CatGrade, number> = {
@@ -78,7 +80,8 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
   const getDamage = useCallback(() => {
     if (!selectedGrade) return 1;
     const base = GRADE_DAMAGE[selectedGrade];
-    return base + Math.floor(enhanceLevel * 0.5);
+    // Enhancement bonus: +1.5 damage per enhancement level
+    return base + Math.floor(enhanceLevel * 1.5);
   }, [selectedGrade, enhanceLevel]);
 
   const startBattle = useCallback(async (stageIdx: number) => {

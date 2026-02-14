@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ALL_CATS, GRADE_CONFIG, CatData, CatGrade } from "../data/cats";
+import * as storage from "../utils/storage";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -48,6 +49,7 @@ interface ExpeditionModalProps {
   collection: string[];
   enhancements: Record<string, { level: number; duplicates: number }>;
   selectedCatId: string; // 현재 선택중인 캐릭터 (원정 불가)
+  playerLevel: storage.PlayerLevelData;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,21 +60,27 @@ const STORAGE_KEY = "cat_tap_expedition";
 const SLOT_COUNT = 3;
 
 const EXPEDITION_DURATIONS: ExpeditionDuration[] = [
-  { label: "단기 원정 (30분)", durationMs: 30 * 60 * 1000, baseReward: 50 },
-  { label: "중기 원정 (2시간)", durationMs: 2 * 60 * 60 * 1000, baseReward: 250 },
-  { label: "장기 원정 (6시간)", durationMs: 6 * 60 * 60 * 1000, baseReward: 1000 },
+  { label: "단기 원정 (3시간)", durationMs: 3 * 60 * 60 * 1000, baseReward: 30 },
+  { label: "중기 원정 (12시간)", durationMs: 12 * 60 * 60 * 1000, baseReward: 150 },
+  { label: "장기 원정 (24시간)", durationMs: 24 * 60 * 60 * 1000, baseReward: 400 },
 ];
 
 const GRADE_MULTIPLIER: Record<CatGrade, number> = {
   C: 1,
-  B: 1.5,
-  A: 2,
-  S: 3,
-  SS: 5,
-  SSS: 10,
+  B: 1.2,
+  A: 1.4,
+  S: 1.6,
+  SS: 1.8,
+  SSS: 2.0,
 };
 
-const ENHANCEMENT_BONUS_PER_LEVEL = 0.2; // +20 % per level
+const ENHANCEMENT_BONUS_PER_LEVEL = 0.1; // +10% per level
+
+const GREAT_SUCCESS_CHANCE = 0.05; // 5% chance for 2x rewards
+const GREAT_SUCCESS_MULTIPLIER = 2;
+
+// HP drain by expedition duration index (0=short, 1=medium, 2=long)
+const HP_AFTER_EXPEDITION = [0.7, 0.3, 0.05]; // 70%, 30%, 5%
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -130,6 +138,7 @@ export default function ExpeditionModal({
   collection,
   enhancements,
   selectedCatId,
+  playerLevel,
 }: ExpeditionModalProps) {
   const [slots, setSlots] = useState<ExpeditionSlot[]>(createEmptySlots);
   const [phase, setPhase] = useState<UIPhase>({ kind: "overview" });
@@ -272,7 +281,24 @@ export default function ExpeditionModal({
       if (!cat) return;
 
       const enhLevel = enhancements[slot.catId]?.level ?? 0;
-      const reward = computeReward(slot.baseReward, cat.grade, enhLevel);
+      let reward = computeReward(slot.baseReward, cat.grade, enhLevel);
+
+      // Great success check (5% chance for 2x rewards)
+      const isGreatSuccess = Math.random() < GREAT_SUCCESS_CHANCE;
+      if (isGreatSuccess) {
+        reward *= GREAT_SUCCESS_MULTIPLIER;
+      }
+
+      // Determine expedition duration index for HP drain
+      let durationIndex = 0;
+      if (slot.duration >= EXPEDITION_DURATIONS[2].durationMs) durationIndex = 2; // long
+      else if (slot.duration >= EXPEDITION_DURATIONS[1].durationMs) durationIndex = 1; // medium
+      else durationIndex = 0; // short
+
+      // Update cat HP based on expedition duration
+      const maxHp = 100; // All cats have 100 max HP
+      const newHp = Math.floor(maxHp * HP_AFTER_EXPEDITION[durationIndex]);
+      await storage.setCatHP(slot.catId, newHp, 0); // Reset tap count to 0
 
       const next = [...slots];
       next[slotIndex] = {
@@ -286,6 +312,13 @@ export default function ExpeditionModal({
       await saveSlots(next);
 
       onReward(reward);
+
+      // Show great success message if applicable
+      if (isGreatSuccess) {
+        setTimeout(() => {
+          alert(`🎉 대성공! 보상 2배 획득! (${reward} 코인)`);
+        }, 100);
+      }
     },
     [slots, enhancements, onReward, saveSlots],
   );
@@ -437,22 +470,34 @@ export default function ExpeditionModal({
     const enhLevel = enhancements[phase.catId]?.level ?? 0;
     const reward = computeReward(exp.baseReward, cat.grade, enhLevel);
 
+    // Determine required level for this expedition duration
+    let requiredLevel = 4; // default for short expedition
+    if (exp.durationMs >= EXPEDITION_DURATIONS[2].durationMs) requiredLevel = 9; // long
+    else if (exp.durationMs >= EXPEDITION_DURATIONS[1].durationMs) requiredLevel = 7; // medium
+
+    const isLocked = playerLevel.level < requiredLevel;
+
     return (
       <TouchableOpacity
         key={exp.label}
-        style={styles.durationItem}
-        activeOpacity={0.7}
-        onPress={() =>
-          setPhase({
-            kind: "confirm",
-            slotIndex: phase.slotIndex,
-            catId: phase.catId,
-            expedition: exp,
-          })
-        }
+        style={[styles.durationItem, isLocked && styles.durationItemLocked]}
+        activeOpacity={isLocked ? 1 : 0.7}
+        disabled={isLocked}
+        onPress={() => {
+          if (!isLocked) {
+            setPhase({
+              kind: "confirm",
+              slotIndex: phase.slotIndex,
+              catId: phase.catId,
+              expedition: exp,
+            });
+          }
+        }}
       >
-        <Text style={styles.durationLabel}>{exp.label}</Text>
-        <Text style={styles.durationReward}>예상 보상: {reward} 코인</Text>
+        <Text style={[styles.durationLabel, isLocked && styles.durationLabelLocked]}>
+          {isLocked ? `🔒 ${exp.label} (Lv.${requiredLevel})` : exp.label}
+        </Text>
+        {!isLocked && <Text style={styles.durationReward}>예상 보상: {reward} 코인</Text>}
       </TouchableOpacity>
     );
   };
@@ -700,12 +745,13 @@ const styles = StyleSheet.create({
   container: {
     width: "100%",
     maxWidth: 400,
-    maxHeight: "85%",
+    height: "85%",
     backgroundColor: "#1a1a2e",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#FFD700",
     overflow: "hidden",
+    display: "flex",
     flexDirection: "column",
   },
 
@@ -718,6 +764,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,215,0,0.25)",
+    flexShrink: 0,
   },
   headerTitle: {
     fontSize: 20,
@@ -978,6 +1025,13 @@ const styles = StyleSheet.create({
   durationReward: {
     fontSize: 13,
     color: "#FFD700",
+  },
+  durationItemLocked: {
+    opacity: 0.5,
+    backgroundColor: "rgba(100,100,100,0.2)",
+  },
+  durationLabelLocked: {
+    color: "#999",
   },
 
   // Confirm screen

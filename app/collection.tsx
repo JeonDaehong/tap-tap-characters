@@ -66,6 +66,49 @@ const sections = buildSections();
 const ENHANCE_STARS = ["", "★", "★★", "★★★", "★★★★", "★★★★★"];
 const ENHANCE_COLORS = ["#888", "#6B9BD1", "#9B6BD1", "#FFD700", "#FF69B4", "#FF4444"];
 
+// Falling heart component
+function FallingHeart({ x, delay }: { x: number; delay: number }) {
+  const translateY = useRef(new Animated.Value(-50)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Delay before starting
+    setTimeout(() => {
+      opacity.setValue(1);
+      Animated.timing(translateY, {
+        toValue: 700,
+        duration: 3000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start();
+
+      // Fade out near the end
+      setTimeout(() => {
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      }, 2500);
+    }, delay);
+  }, []);
+
+  return (
+    <Animated.Text
+      style={{
+        position: "absolute",
+        left: x,
+        top: 0,
+        fontSize: 30,
+        transform: [{ translateY }],
+        opacity,
+      }}
+    >
+      💖
+    </Animated.Text>
+  );
+}
+
 export default function CollectionScreen() {
   const router = useRouter();
   const [collection, setCollection] = useState<string[]>([]);
@@ -81,6 +124,10 @@ export default function CollectionScreen() {
   const [expeditionCatIds, setExpeditionCatIds] = useState<Set<string>>(new Set());
   const [affinityVisible, setAffinityVisible] = useState(false);
   const [affinityCatId, setAffinityCatId] = useState("");
+  const [maxAffinityCats, setMaxAffinityCats] = useState<Set<string>>(new Set());
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; delay: number }>>([]);
+  const heartIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [playerLevel, setPlayerLevel] = useState<storage.PlayerLevelData>({ level: 1, xp: 0 });
 
   // Enhancement animation
   const [enhancing, setEnhancing] = useState(false);
@@ -98,19 +145,23 @@ export default function CollectionScreen() {
         return true;
       }
       if (detailCat) {
+        stopHeartEffect();
         setDetailCat(null);
         return true;
       }
       router.back();
       return true;
     });
-    return () => handler.remove();
+    return () => {
+      handler.remove();
+      stopHeartEffect();
+    };
   }, [detailCat, affinityVisible, router]);
 
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [rawCollection, sel, tut, savedStep, savedCatId, enhData, oSkins, eqSkins] = await Promise.all([
+        const [rawCollection, sel, tut, savedStep, savedCatId, enhData, oSkins, eqSkins, pLevel] = await Promise.all([
           storage.getCollection(),
           storage.getSelectedCat(),
           storage.getTutorialComplete(),
@@ -119,6 +170,7 @@ export default function CollectionScreen() {
           storage.getAllCatEnhancements(),
           storage.getOwnedSkins(),
           storage.getAllEquippedSkinsData(),
+          storage.getPlayerLevel(),
         ]);
         const validIds = new Set(ALL_CATS.map(cat => cat.id));
         const c = rawCollection.filter(id => validIds.has(id));
@@ -127,6 +179,7 @@ export default function CollectionScreen() {
         setEnhancements(enhData);
         setOwnedSkins(oSkins);
         setEquippedSkins(eqSkins);
+        setPlayerLevel(pLevel);
 
         // Load expedition cats
         const expeditions = await storage.getExpeditions();
@@ -137,6 +190,16 @@ export default function CollectionScreen() {
             .filter(Boolean)
         );
         setExpeditionCatIds(expCats);
+
+        // Load affinity data
+        const maxAffCats = new Set<string>();
+        for (const catId of AFFINITY_CATS) {
+          const affData = await storage.getAffinity(catId);
+          if (affData.level >= 10) {
+            maxAffCats.add(catId);
+          }
+        }
+        setMaxAffinityCats(maxAffCats);
 
         if (!tut && savedStep === 3 && savedCatId) {
           setTutorialStep(4);
@@ -157,6 +220,44 @@ export default function CollectionScreen() {
     if (tutorialStep === 4) {
       setTutorialStep(5);
     }
+    // Start heart effect if max affinity
+    if (maxAffinityCats.has(cat.id)) {
+      startHeartEffect();
+    }
+  };
+
+  const startHeartEffect = () => {
+    // Clear any existing interval
+    if (heartIntervalRef.current) {
+      clearInterval(heartIntervalRef.current);
+    }
+
+    // Generate initial batch
+    const generateHearts = () => {
+      const newHearts = Array.from({ length: 8 }, (_, i) => ({
+        id: Date.now() + Math.random() * 1000 + i,
+        x: Math.random() * 280 + 10,
+        delay: Math.random() * 1500,
+      }));
+      setHearts(prev => [...prev, ...newHearts]);
+
+      // Clean up old hearts (older than 5 seconds)
+      setTimeout(() => {
+        setHearts(prev => prev.filter(h => Date.now() - h.id < 5000));
+      }, 5000);
+    };
+
+    generateHearts();
+    // Generate new batch every 2 seconds
+    heartIntervalRef.current = setInterval(generateHearts, 2000);
+  };
+
+  const stopHeartEffect = () => {
+    if (heartIntervalRef.current) {
+      clearInterval(heartIntervalRef.current);
+      heartIntervalRef.current = null;
+    }
+    setHearts([]);
   };
 
   const handleAffinityReward = async (coins: number) => {
@@ -174,6 +275,7 @@ export default function CollectionScreen() {
     if (expeditionCatIds.has(detailCat.id)) return; // 원정 중 교체 불가
     setSelectedCatId(detailCat.id);
     await storage.setSelectedCat(detailCat.id);
+    stopHeartEffect();
     setDetailCat(null);
 
     if (tutorialStep === 5) {
@@ -241,6 +343,11 @@ export default function CollectionScreen() {
       if (result) {
         setEnhancements(prev => ({ ...prev, [detailCat.id]: result }));
         setEnhanceSuccess(true);
+
+        // Update quest progress for enhancement
+        const questProgress = await storage.getQuestProgress();
+        questProgress.weeklyEnhancements += 1;
+        await storage.setQuestProgress(questProgress);
       }
       setEnhancing(false);
 
@@ -351,6 +458,15 @@ export default function CollectionScreen() {
       {/* Detail Modal */}
       <Modal transparent visible={!!detailCat} animationType="fade">
         <View style={styles.overlay}>
+          {/* Falling hearts effect */}
+          {hearts.length > 0 && (
+            <View style={styles.heartsContainer} pointerEvents="none">
+              {hearts.map(heart => (
+                <FallingHeart key={heart.id} x={heart.x} delay={heart.delay} />
+              ))}
+            </View>
+          )}
+
           <ScrollView contentContainerStyle={styles.detailScroll} showsVerticalScrollIndicator={false}>
           <View style={styles.detailModal}>
             {detailCat && (() => {
@@ -359,8 +475,9 @@ export default function CollectionScreen() {
               const baseConfig = GRADE_CONFIG[detailCat.grade];
               const isEquipped = detailCat.id === selectedCatId;
               const cost = getEnhancementCost(enh.level);
-              const canEnhance = enh.level < MAX_ENHANCEMENT && enh.duplicates >= cost;
+              const canEnhance = enh.level < MAX_ENHANCEMENT && enh.duplicates >= cost && playerLevel.level >= 2;
               const isMaxed = enh.level >= MAX_ENHANCEMENT;
+              const isLevelLocked = playerLevel.level < 2;
 
               return (
                 <>
@@ -531,9 +648,9 @@ export default function CollectionScreen() {
                                 disabled={!canEnhance || enhancing}
                               >
                                 <Text style={styles.enhButtonText}>
-                                  {enhancing ? "강화 중..." : `+${enh.level + 1}강 승급`}
+                                  {enhancing ? "강화 중..." : isLevelLocked ? "🔒 승급 (Lv.2)" : `+${enh.level + 1}강 승급`}
                                 </Text>
-                                {!enhancing && (
+                                {!enhancing && !isLevelLocked && (
                                   <Text style={styles.enhButtonCost}>
                                     재료 {cost}개 소모
                                   </Text>
@@ -618,7 +735,10 @@ export default function CollectionScreen() {
                       </View>
                     )}
                     {tutorialStep === 0 && (
-                      <Pressable style={styles.closeButton} onPress={() => setDetailCat(null)}>
+                      <Pressable style={styles.closeButton} onPress={() => {
+                        stopHeartEffect();
+                        setDetailCat(null);
+                      }}>
                         <Text style={styles.closeButtonText}>닫기</Text>
                       </Pressable>
                     )}
@@ -1045,5 +1165,15 @@ const styles = StyleSheet.create({
     color: "#FF69B4",
     fontSize: 15,
     fontWeight: "bold",
+  },
+
+  // Hearts effect
+  heartsContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
   },
 });

@@ -41,12 +41,16 @@ import QuestModal from "../components/QuestModal";
 import RankingModal from "../components/RankingModal";
 import BossBattleModal from "../components/BossBattleModal";
 import AttendanceModal from "../components/AttendanceModal";
+import ShopModal from "../components/ShopModal";
+import InventoryModal from "../components/InventoryModal";
+import GreedMazeModal from "../components/GreedMazeModal";
 import * as storage from "../utils/storage";
 
 export default function GameScreen() {
   const router = useRouter();
   const [score, setScore] = useState(0);
   const [coins, setCoins] = useState(0);
+  const [playerLevel, setPlayerLevel] = useState<storage.PlayerLevelData>({ level: 1, xp: 0 });
   const [danceFrame, setDanceFrame] = useState(0);
   const [collection, setCollection] = useState<string[]>([]);
   const [selectedCatId, setSelectedCatId] = useState("");
@@ -84,6 +88,12 @@ export default function GameScreen() {
   const [moreMenuVisible, setMoreMenuVisible] = useState(false);
   const [questProgress, setQuestProgress] = useState<storage.QuestProgress>(storage.DEFAULT_QUEST_PROGRESS);
   const [enhancements, setEnhancements] = useState<Record<string, storage.EnhancementData>>({});
+  const [shopVisible, setShopVisible] = useState(false);
+  const [inventoryVisible, setInventoryVisible] = useState(false);
+  const [mazeVisible, setMazeVisible] = useState(false);
+  const [greedDice, setGreedDice] = useState(0);
+  const [lockModalInfo, setLockModalInfo] = useState<{ feature: string; level: number } | null>(null);
+  const [levelUpInfo, setLevelUpInfo] = useState<{ level: number; unlocks: string[] } | null>(null);
 
   const [tutorialDone, setTutorialDone] = useState(true);
   const [tutorialStep, setTutorialStep] = useState(0); // 0=done, 1=tap 뽑기, 2=tap 일반뽑기, 3=tap 컬렉션
@@ -219,7 +229,7 @@ export default function GameScreen() {
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const [s, c, sel, co, tut, achList, sfx, med, oSkins] = await Promise.all([
+        const [s, c, sel, co, tut, achList, sfx, med, oSkins, plvl] = await Promise.all([
           storage.getScore(),
           storage.getCollection(),
           storage.getSelectedCat(),
@@ -229,6 +239,7 @@ export default function GameScreen() {
           storage.getSfxEnabled(),
           storage.getMedals(),
           storage.getOwnedSkins(),
+          storage.getPlayerLevel(),
         ]);
         setScore(s);
         const validIds = new Set(ALL_CATS.map(cat => cat.id));
@@ -240,6 +251,11 @@ export default function GameScreen() {
         setSfxEnabled(sfx);
         setMedals(med);
         setOwnedSkins(oSkins);
+        setPlayerLevel(plvl);
+
+        // Load inventory for greedDice count
+        const inv = await storage.getInventory();
+        setGreedDice(inv.greedDice);
 
         // Load quest progress and enhancements
         const [qp, allEnh] = await Promise.all([
@@ -415,6 +431,31 @@ export default function GameScreen() {
     setQuestProgress((prev: storage.QuestProgress) => {
       const updated = { ...prev, dailyTaps: prev.dailyTaps + 1, weeklyTaps: prev.weeklyTaps + 1 };
       storage.setQuestProgress(updated);
+      return updated;
+    });
+
+    // Player XP: +1 per tap
+    setPlayerLevel((prev: storage.PlayerLevelData) => {
+      const updated = storage.addPlayerXp(prev, 1);
+      storage.setPlayerLevel(updated);
+      if (updated.level !== prev.level) {
+        // Level up! Show modal with unlock info
+        const LEVEL_UNLOCKS: Record<number, string[]> = {
+          2: ["강화 시스템", "상점", "아이템창"],
+          3: ["오늘의 운세"],
+          4: ["단기 원정"],
+          5: ["기억력 게임"],
+          6: ["황금왕관 뽑기", "스킨 뽑기"],
+          7: ["중기 원정"],
+          8: ["도전의 탑"],
+          9: ["장기 원정"],
+          10: ["랭킹"],
+        };
+        const unlocks = LEVEL_UNLOCKS[updated.level] ?? [];
+        setTimeout(() => {
+          setLevelUpInfo({ level: updated.level, unlocks });
+        }, 100);
+      }
       return updated;
     });
 
@@ -698,6 +739,78 @@ export default function GameScreen() {
     }
   }, [coins, medals]);
 
+  const handleShopPurchase = useCallback(async (itemType: "lifePotion" | "greedDice", cost: number) => {
+    const newCoins = coins - cost;
+    setCoins(newCoins);
+    await storage.setCoins(newCoins);
+    if (itemType === "greedDice") {
+      const inv = await storage.getInventory();
+      setGreedDice(inv.greedDice);
+    }
+  }, [coins]);
+
+  const handleUseLifePotion = useCallback(async () => {
+    // Recover all cats' HP to 100
+    const coll = await storage.getCollection();
+    for (const catId of coll) {
+      await storage.setCatHP(catId, 100, 0);
+    }
+    if (selectedCatId) setHp(100);
+  }, [selectedCatId]);
+
+  const handleOpenMaze = useCallback(() => {
+    setInventoryVisible(false);
+    setMazeVisible(true);
+  }, []);
+
+  const handleMazeRewardCoins = useCallback(async (amount: number) => {
+    const newCoins = coins + amount;
+    setCoins(newCoins);
+    await storage.setCoins(newCoins);
+  }, [coins]);
+
+  const handleMazeRewardXp = useCallback(async (amount: number) => {
+    setPlayerLevel((prev: storage.PlayerLevelData) => {
+      const updated = storage.addPlayerXp(prev, amount);
+      storage.setPlayerLevel(updated);
+      if (updated.level !== prev.level) {
+        const LEVEL_UNLOCKS: Record<number, string[]> = {
+          2: ["강화 시스템", "상점", "아이템창"], 3: ["오늘의 운세"], 4: ["단기 원정"],
+          5: ["기억력 게임"], 6: ["황금왕관 뽑기", "스킨 뽑기"], 7: ["중기 원정"],
+          8: ["도전의 탑"], 9: ["장기 원정"], 10: ["랭킹"],
+        };
+        setTimeout(() => setLevelUpInfo({ level: updated.level, unlocks: LEVEL_UNLOCKS[updated.level] ?? [] }), 100);
+      }
+      return updated;
+    });
+  }, []);
+
+  const handleMazeBuff = useCallback(async (multiplier: number, durationMs: number) => {
+    const buff: storage.BuffData = { tapMultiplier: multiplier, buffExpiry: Date.now() + durationMs };
+    await storage.setActiveBuff(buff);
+  }, []);
+
+  const handleMazeHpPenalty = useCallback(async (hpLoss: number) => {
+    const coll = await storage.getCollection();
+    for (const catId of coll) {
+      const hpData = await storage.getCatHP(catId);
+      await storage.setCatHP(catId, Math.max(0, hpData.hp - hpLoss), 0);
+    }
+    if (selectedCatId) {
+      const newHp = Math.max(0, hp - hpLoss);
+      setHp(newHp);
+    }
+  }, [selectedCatId, hp]);
+
+  const handleUseDice = useCallback(async () => {
+    const inv = await storage.getInventory();
+    if (inv.greedDice > 0) {
+      inv.greedDice -= 1;
+      await storage.setInventory(inv);
+      setGreedDice(inv.greedDice);
+    }
+  }, []);
+
   const handleClaimQuest = useCallback(async (questType: "daily" | "weekly", index: number) => {
     setQuestProgress((prev: storage.QuestProgress) => {
       const updated = { ...prev };
@@ -773,16 +886,13 @@ export default function GameScreen() {
       {/* Top bar */}
       <View style={styles.topBar}>
         <View style={styles.topLeft}>
-          <Pressable
-            style={styles.debugBtn}
-            onPress={async () => {
-              const c = coins + 100;
-              setCoins(c);
-              await storage.setCoins(c);
-            }}
-          >
-            <Text style={styles.debugBtnText}>+100</Text>
-          </Pressable>
+          <View style={styles.levelArea}>
+            <Text style={styles.levelLabel}>Lv.{playerLevel.level}</Text>
+            <View style={styles.xpBarContainer}>
+              <View style={[styles.xpBarFill, { width: `${Math.min((playerLevel.xp / storage.getPlayerXpNeeded(playerLevel.level)) * 100, 100)}%` }]} />
+            </View>
+            <Text style={styles.xpText}>{playerLevel.xp}/{storage.getPlayerXpNeeded(playerLevel.level)}</Text>
+          </View>
         </View>
         <View style={styles.scoreArea}>
           <Text style={styles.scoreLabel}>SCORE</Text>
@@ -955,8 +1065,18 @@ export default function GameScreen() {
           </Pressable>
         </View>
 
-        <Pressable onPress={() => setRankingVisible(true)} style={[styles.bottomTab, { flex: 1 }, tutorialStep > 0 && styles.bottomBtnDisabled]} disabled={tutorialStep > 0}>
-          <Text style={styles.bottomTabEmoji}>🏆</Text>
+        <Pressable
+          onPress={() => {
+            if (playerLevel.level >= 10) {
+              setRankingVisible(true);
+            } else if (tutorialStep === 0) {
+              setLockModalInfo({ feature: "랭킹", level: 10 });
+            }
+          }}
+          style={[styles.bottomTab, { flex: 1 }, (tutorialStep > 0 || playerLevel.level < 10) && styles.bottomBtnDisabled]}
+          disabled={tutorialStep > 0}
+        >
+          <Text style={styles.bottomTabEmoji}>{playerLevel.level < 10 ? "🔒" : "🏆"}</Text>
           <Text style={styles.bottomTabLabel}>랭킹</Text>
         </Pressable>
 
@@ -973,19 +1093,52 @@ export default function GameScreen() {
             <Text style={styles.gachaMenuTitle}>메뉴</Text>
             <View style={styles.menuDivider} />
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setMiniGameMenuVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>🎮</Text>
+            <Pressable
+              style={[styles.gachaMenuItem, playerLevel.level < 3 && styles.gachaMenuItemDisabled]}
+              onPress={() => {
+                if (playerLevel.level >= 3) {
+                  setMoreMenuVisible(false);
+                  setMiniGameMenuVisible(true);
+                } else {
+                  setMoreMenuVisible(false);
+                  setLockModalInfo({ feature: "미니게임", level: 3 });
+                }
+              }}
+            >
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 3 ? "🔒" : "🎮"}</Text>
               <Text style={styles.gachaMenuText}>미니게임</Text>
             </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setExpeditionVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>⚔️</Text>
+            <Pressable
+              style={[styles.gachaMenuItem, playerLevel.level < 4 && styles.gachaMenuItemDisabled]}
+              onPress={() => {
+                if (playerLevel.level >= 4) {
+                  setMoreMenuVisible(false);
+                  setExpeditionVisible(true);
+                } else {
+                  setMoreMenuVisible(false);
+                  setLockModalInfo({ feature: "원정대", level: 4 });
+                }
+              }}
+            >
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 4 ? "🔒" : "⚔️"}</Text>
               <Text style={styles.gachaMenuText}>원정대</Text>
             </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setBossVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>🐉</Text>
-              <Text style={styles.gachaMenuText}>보스 도전</Text>
+            <Pressable
+              style={[styles.gachaMenuItem, playerLevel.level < 8 && styles.gachaMenuItemDisabled]}
+              onPress={() => {
+                if (playerLevel.level >= 8) {
+                  setMoreMenuVisible(false);
+                  setBossVisible(true);
+                } else {
+                  setMoreMenuVisible(false);
+                  setLockModalInfo({ feature: "도전의 탑", level: 8 });
+                }
+              }}
+            >
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 8 ? "🔒" : "🏰"}</Text>
+              <Text style={styles.gachaMenuText}>도전의 탑</Text>
             </Pressable>
 
             <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setQuestVisible(true); }}>
@@ -1001,6 +1154,38 @@ export default function GameScreen() {
             <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAttendanceVisible(true); }}>
               <Text style={styles.gachaMenuEmoji}>📅</Text>
               <Text style={styles.gachaMenuText}>출석 체크</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
+              onPress={() => {
+                if (playerLevel.level >= 2) {
+                  setMoreMenuVisible(false);
+                  setShopVisible(true);
+                } else {
+                  setMoreMenuVisible(false);
+                  setLockModalInfo({ feature: "상점", level: 2 });
+                }
+              }}
+            >
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🏪"}</Text>
+              <Text style={styles.gachaMenuText}>상점</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
+              onPress={() => {
+                if (playerLevel.level >= 2) {
+                  setMoreMenuVisible(false);
+                  setInventoryVisible(true);
+                } else {
+                  setMoreMenuVisible(false);
+                  setLockModalInfo({ feature: "아이템창", level: 2 });
+                }
+              }}
+            >
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🎒"}</Text>
+              <Text style={styles.gachaMenuText}>아이템창</Text>
             </Pressable>
 
             <Pressable onPress={() => setMoreMenuVisible(false)} style={styles.gachaMenuClose}>
@@ -1051,6 +1236,11 @@ export default function GameScreen() {
             <Pressable
               onPress={() => {
                 if (tutorialStep === 2) return;
+                if (playerLevel.level < 6) {
+                  setGachaMenuVisible(false);
+                  setLockModalInfo({ feature: "황금왕관 뽑기", level: 6 });
+                  return;
+                }
                 if (coins < 100) {
                   setGachaMenuVisible(false);
                   setInsufficientMsg(`코인이 부족합니다!\n필요: 💰 100 / 보유: 💰 ${coins}`);
@@ -1059,26 +1249,29 @@ export default function GameScreen() {
                 setGachaMenuVisible(false);
                 setSlotVisible(true);
               }}
-              style={[styles.gachaMenuItem, tutorialStep === 2 && styles.gachaMenuItemDisabledTutorial]}
-              disabled={tutorialStep === 2}
+              style={[styles.gachaMenuItem, (tutorialStep === 2 || playerLevel.level < 6) && styles.gachaMenuItemDisabledTutorial]}
             >
-              <Text style={styles.gachaMenuEmoji}>👑</Text>
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 6 ? "🔒" : "👑"}</Text>
               <Text style={styles.gachaMenuText}>황금왕관 뽑기</Text>
-              <Text style={styles.gachaMenuCost}>💰 100</Text>
+              {playerLevel.level >= 6 && <Text style={styles.gachaMenuCost}>💰 100</Text>}
             </Pressable>
 
             <Pressable
               onPress={() => {
                 if (tutorialStep === 2) return;
+                if (playerLevel.level < 6) {
+                  setGachaMenuVisible(false);
+                  setLockModalInfo({ feature: "스킨 뽑기", level: 6 });
+                  return;
+                }
                 setGachaMenuVisible(false);
                 setSkinGachaVisible(true);
               }}
-              style={[styles.gachaMenuItem, tutorialStep === 2 && styles.gachaMenuItemDisabledTutorial]}
-              disabled={tutorialStep === 2}
+              style={[styles.gachaMenuItem, (tutorialStep === 2 || playerLevel.level < 6) && styles.gachaMenuItemDisabledTutorial]}
             >
-              <Text style={styles.gachaMenuEmoji}>👗</Text>
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 6 ? "🔒" : "👗"}</Text>
               <Text style={styles.gachaMenuText}>스킨 뽑기</Text>
-              <Text style={styles.gachaMenuCost}>👑 100</Text>
+              {playerLevel.level >= 6 && <Text style={styles.gachaMenuCost}>👑 100</Text>}
             </Pressable>
 
             {tutorialStep === 0 && (
@@ -1134,19 +1327,35 @@ export default function GameScreen() {
             <View style={styles.menuDivider} />
 
             <Pressable
-              onPress={() => { setMiniGameMenuVisible(false); setMemoryGameVisible(true); }}
-              style={styles.gachaMenuItem}
+              onPress={() => {
+                if (playerLevel.level >= 5) {
+                  setMiniGameMenuVisible(false);
+                  setMemoryGameVisible(true);
+                } else {
+                  setMiniGameMenuVisible(false);
+                  setLockModalInfo({ feature: "기억력 게임", level: 5 });
+                }
+              }}
+              style={[styles.gachaMenuItem, playerLevel.level < 5 && styles.gachaMenuItemDisabled]}
             >
-              <Text style={styles.gachaMenuEmoji}>🃏</Text>
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 5 ? "🔒" : "🃏"}</Text>
               <Text style={styles.gachaMenuText}>기억력 게임</Text>
-              <Text style={styles.gachaMenuCost}>1일 1회</Text>
+              {playerLevel.level >= 5 && <Text style={styles.gachaMenuCost}>1일 1회</Text>}
             </Pressable>
 
             <Pressable
-              onPress={() => { setMiniGameMenuVisible(false); setFortuneVisible(true); }}
-              style={styles.gachaMenuItem}
+              onPress={() => {
+                if (playerLevel.level >= 3) {
+                  setMiniGameMenuVisible(false);
+                  setFortuneVisible(true);
+                } else {
+                  setMiniGameMenuVisible(false);
+                  setLockModalInfo({ feature: "오늘의 운세", level: 3 });
+                }
+              }}
+              style={[styles.gachaMenuItem, playerLevel.level < 3 && styles.gachaMenuItemDisabled]}
             >
-              <Text style={styles.gachaMenuEmoji}>🔮</Text>
+              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 3 ? "🔒" : "🔮"}</Text>
               <Text style={styles.gachaMenuText}>오늘의 운세</Text>
               <Text style={styles.gachaMenuCost}>1일 1회</Text>
             </Pressable>
@@ -1176,6 +1385,7 @@ export default function GameScreen() {
         collection={collection}
         enhancements={enhancements}
         selectedCatId={selectedCatId}
+        playerLevel={playerLevel}
       />
       <QuestModal
         visible={questVisible}
@@ -1202,6 +1412,83 @@ export default function GameScreen() {
         onClose={() => setAttendanceVisible(false)}
         onReward={handleAttendanceReward}
       />
+      <ShopModal
+        visible={shopVisible}
+        onClose={() => setShopVisible(false)}
+        coins={coins}
+        onPurchase={handleShopPurchase}
+      />
+      <InventoryModal
+        visible={inventoryVisible}
+        onClose={() => setInventoryVisible(false)}
+        onUseLifePotion={handleUseLifePotion}
+        onOpenMaze={handleOpenMaze}
+      />
+      <GreedMazeModal
+        visible={mazeVisible}
+        onClose={() => setMazeVisible(false)}
+        onRewardCoins={handleMazeRewardCoins}
+        onRewardXp={handleMazeRewardXp}
+        onBuff={handleMazeBuff}
+        onHpPenalty={handleMazeHpPenalty}
+        greedDice={greedDice}
+        onUseDice={handleUseDice}
+      />
+
+      {/* Lock Info Modal */}
+      <Modal
+        visible={!!lockModalInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLockModalInfo(null)}
+      >
+        <Pressable style={styles.comingSoonOverlay} onPress={() => setLockModalInfo(null)}>
+          <View style={styles.comingSoonBox}>
+            <Text style={styles.comingSoonEmoji}>🔒</Text>
+            <Text style={styles.comingSoonTitle}>{lockModalInfo?.feature}</Text>
+            <Text style={styles.comingSoonDesc}>
+              이 기능은 플레이어 레벨 {lockModalInfo?.level}에{"\n"}해금됩니다.{"\n\n"}현재 레벨: Lv.{playerLevel.level}
+            </Text>
+            <View style={styles.lockProgressArea}>
+              <View style={styles.lockProgressBar}>
+                <View style={[styles.lockProgressFill, { width: `${Math.min((playerLevel.level / (lockModalInfo?.level ?? 1)) * 100, 100)}%` }]} />
+              </View>
+              <Text style={styles.lockProgressText}>Lv.{playerLevel.level} / Lv.{lockModalInfo?.level}</Text>
+            </View>
+            <Pressable onPress={() => setLockModalInfo(null)} style={styles.comingSoonBtn}>
+              <Text style={styles.comingSoonBtnText}>확인</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Level Up Modal */}
+      <Modal
+        visible={!!levelUpInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLevelUpInfo(null)}
+      >
+        <Pressable style={styles.comingSoonOverlay} onPress={() => setLevelUpInfo(null)}>
+          <View style={[styles.comingSoonBox, styles.levelUpBox]}>
+            <Text style={styles.levelUpEmoji}>🎉</Text>
+            <Text style={styles.levelUpTitle}>레벨 업!</Text>
+            <Text style={styles.levelUpLevel}>Lv.{levelUpInfo?.level}</Text>
+            {levelUpInfo && levelUpInfo.unlocks.length > 0 && (
+              <View style={styles.levelUpUnlocks}>
+                <Text style={styles.levelUpUnlockTitle}>새로운 기능 해금!</Text>
+                {levelUpInfo.unlocks.map((unlock, i) => (
+                  <Text key={i} style={styles.levelUpUnlockItem}>🔓 {unlock}</Text>
+                ))}
+              </View>
+            )}
+            <Pressable onPress={() => setLevelUpInfo(null)} style={[styles.comingSoonBtn, styles.levelUpBtn]}>
+              <Text style={styles.comingSoonBtnText}>확인</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       <AchievementCelebration
         achievement={celebratingAchievement}
         onDone={onCelebrationDone}
@@ -1363,6 +1650,7 @@ const styles = StyleSheet.create({
     color: "#FFD700",
     fontWeight: "bold",
   },
+  // (levelPill moved to levelArea in top left)
   gradeBadge: {
     paddingHorizontal: 16,
     paddingVertical: 4,
@@ -1869,5 +2157,105 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,80,80,0.3)",
+  },
+  // Level area (top left)
+  levelArea: {
+    alignItems: "flex-start" as const,
+  },
+  levelLabel: {
+    color: "#6496FF",
+    fontSize: 16,
+    fontWeight: "bold" as const,
+    marginBottom: 3,
+  },
+  xpBarContainer: {
+    width: 80,
+    height: 6,
+    backgroundColor: "rgba(100,150,255,0.15)",
+    borderRadius: 3,
+    overflow: "hidden" as const,
+    marginBottom: 2,
+  },
+  xpBarFill: {
+    height: "100%" as const,
+    backgroundColor: "#6496FF",
+    borderRadius: 3,
+  },
+  xpText: {
+    color: "rgba(100,150,255,0.6)",
+    fontSize: 9,
+  },
+  // Lock modal progress
+  lockProgressArea: {
+    width: "100%" as const,
+    marginTop: 16,
+    alignItems: "center" as const,
+  },
+  lockProgressBar: {
+    width: "80%" as const,
+    height: 10,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 5,
+    overflow: "hidden" as const,
+    marginBottom: 6,
+  },
+  lockProgressFill: {
+    height: "100%" as const,
+    backgroundColor: "#FFD700",
+    borderRadius: 5,
+  },
+  lockProgressText: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+  },
+  // Level up modal
+  levelUpBox: {
+    borderColor: "#FFD700",
+    borderWidth: 2,
+  },
+  levelUpEmoji: {
+    fontSize: 60,
+    marginBottom: 8,
+  },
+  levelUpTitle: {
+    color: "#FFD700",
+    fontSize: 28,
+    fontWeight: "bold" as const,
+    marginBottom: 4,
+  },
+  levelUpLevel: {
+    color: "#fff",
+    fontSize: 36,
+    fontWeight: "bold" as const,
+    marginBottom: 12,
+    textShadowColor: "rgba(255,215,0,0.5)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+  },
+  levelUpUnlocks: {
+    backgroundColor: "rgba(255,215,0,0.08)",
+    borderRadius: 14,
+    padding: 14,
+    width: "100%" as const,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(255,215,0,0.2)",
+  },
+  levelUpUnlockTitle: {
+    color: "#FFD700",
+    fontSize: 14,
+    fontWeight: "bold" as const,
+    textAlign: "center" as const,
+    marginBottom: 8,
+  },
+  levelUpUnlockItem: {
+    color: "#fff",
+    fontSize: 14,
+    marginBottom: 4,
+    textAlign: "center" as const,
+  },
+  levelUpBtn: {
+    backgroundColor: "rgba(255,215,0,0.15)",
+    borderColor: "rgba(255,215,0,0.3)",
   },
 });

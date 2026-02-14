@@ -451,14 +451,21 @@ export interface AffinityData {
   level: number;       // 0~10
   xp: number;          // current XP within level
   readChapters: number[]; // chapters already read (1-5)
+  claimedRewards: number[]; // chapters whose rewards have been claimed (1-5)
   unlockedSpecial: boolean; // y_story_100 viewed
 }
 
-const AFFINITY_XP_TABLE = [0, 10, 30, 60, 100, 150, 220, 300, 400, 520]; // XP needed for level 1→2, 2→3, ...10
+const AFFINITY_XP_TABLE = [0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5200]; // XP needed for level 1→2, 2→3, ...10 (10x)
 
 export async function getAffinity(catId: string): Promise<AffinityData> {
   const v = await AsyncStorage.getItem(`${AFFINITY_KEY}_${catId}`);
-  return v ? JSON.parse(v) : { level: 0, xp: 0, readChapters: [], unlockedSpecial: false };
+  if (v) {
+    const parsed = JSON.parse(v);
+    // Backward compatibility: add claimedRewards if missing
+    if (!parsed.claimedRewards) parsed.claimedRewards = [];
+    return parsed;
+  }
+  return { level: 0, xp: 0, readChapters: [], claimedRewards: [], unlockedSpecial: false };
 }
 
 export async function setAffinity(catId: string, data: AffinityData): Promise<void> {
@@ -467,7 +474,12 @@ export async function setAffinity(catId: string, data: AffinityData): Promise<vo
 
 export function addAffinityXp(data: AffinityData, amount: number): AffinityData {
   if (data.level >= 10) return data;
-  const updated = { ...data, xp: data.xp + amount, readChapters: [...data.readChapters] };
+  const updated = {
+    ...data,
+    xp: data.xp + amount,
+    readChapters: [...data.readChapters],
+    claimedRewards: [...(data.claimedRewards || [])]
+  };
   while (updated.level < 10) {
     const needed = AFFINITY_XP_TABLE[updated.level];
     if (updated.xp >= needed) {
@@ -528,4 +540,220 @@ export async function enhanceCat(catId: string): Promise<EnhancementData | null>
   data.level += 1;
   await saveAllEnhancements(all);
   return data;
+}
+
+// --- Player Level System ---
+const PLAYER_LEVEL_KEY = "cat_tap_player_level";
+
+export interface PlayerLevelData {
+  level: number; // 1~10+
+  xp: number;    // current XP within level
+}
+
+// XP needed: 100 base, 2x per level, no max level
+
+export async function getPlayerLevel(): Promise<PlayerLevelData> {
+  const v = await AsyncStorage.getItem(PLAYER_LEVEL_KEY);
+  return v ? JSON.parse(v) : { level: 1, xp: 0 };
+}
+
+export async function setPlayerLevel(data: PlayerLevelData): Promise<void> {
+  await AsyncStorage.setItem(PLAYER_LEVEL_KEY, JSON.stringify(data));
+}
+
+export function addPlayerXp(data: PlayerLevelData, amount: number): PlayerLevelData {
+  const updated = { ...data, xp: data.xp + amount };
+  while (true) {
+    const needed = getPlayerXpNeeded(updated.level);
+    if (updated.xp >= needed) {
+      updated.xp -= needed;
+      updated.level += 1;
+    } else {
+      break;
+    }
+  }
+  return updated;
+}
+
+export function getPlayerXpNeeded(level: number): number {
+  return 100 * Math.pow(2, level - 1);
+}
+
+// Feature unlock requirements
+export function isFeatureUnlocked(feature: string, playerLevel: number): boolean {
+  const unlockLevels: Record<string, number> = {
+    // Always available (level 1)
+    collection: 1,
+    normalGacha: 1,
+    attendance: 1,
+    achievements: 1,
+    quests: 1,
+    affinity: 1,
+    // Level-based unlocks
+    enhancement: 2,
+    shop: 2,
+    inventory: 2,
+    fortune: 3,
+    expedition1: 4,
+    memoryGame: 5,
+    medalGacha: 6,
+    skinGacha: 6,
+    expedition2: 7,
+    boss: 8,
+    expedition3: 9,
+    ranking: 10,
+  };
+
+  return playerLevel >= (unlockLevels[feature] ?? 999);
+}
+
+export function getExpeditionSlotsUnlocked(playerLevel: number): number {
+  if (playerLevel >= 9) return 3;
+  if (playerLevel >= 7) return 2;
+  if (playerLevel >= 4) return 1;
+  return 0;
+}
+
+// --- Greed Maze ---
+const MAZE_KEY = "cat_tap_maze";
+
+export interface MazeTile {
+  type: "reward" | "penalty";
+  subType: string;
+  value: number;
+}
+
+export interface MazeData {
+  currentPosition: number;
+  tiles: MazeTile[];
+  completed: boolean;
+}
+
+export async function getMazeData(): Promise<MazeData | null> {
+  const v = await AsyncStorage.getItem(MAZE_KEY);
+  return v ? JSON.parse(v) : null;
+}
+
+export async function setMazeData(data: MazeData | null): Promise<void> {
+  if (data === null) {
+    await AsyncStorage.removeItem(MAZE_KEY);
+  } else {
+    await AsyncStorage.setItem(MAZE_KEY, JSON.stringify(data));
+  }
+}
+
+// --- Shop & Inventory System ---
+const INVENTORY_KEY = "cat_tap_inventory";
+const SHOP_KEY = "cat_tap_shop";
+
+export interface InventoryData {
+  lifePotion: number;
+  greedDice: number;
+}
+
+export interface ShopPurchaseData {
+  lifePotionBought: number;
+  greedDiceBought: number;
+  weekStartDate: string;
+}
+
+export async function getInventory(): Promise<InventoryData> {
+  const v = await AsyncStorage.getItem(INVENTORY_KEY);
+  return v ? JSON.parse(v) : { lifePotion: 0, greedDice: 0 };
+}
+
+export async function setInventory(data: InventoryData): Promise<void> {
+  await AsyncStorage.setItem(INVENTORY_KEY, JSON.stringify(data));
+}
+
+export async function getShopPurchases(): Promise<ShopPurchaseData> {
+  const v = await AsyncStorage.getItem(SHOP_KEY);
+  const data: ShopPurchaseData = v ? JSON.parse(v) : {
+    lifePotionBought: 0,
+    greedDiceBought: 0,
+    weekStartDate: "",
+  };
+  const weekStart = getWeekStartStr();
+  if (data.weekStartDate !== weekStart) {
+    data.lifePotionBought = 0;
+    data.greedDiceBought = 0;
+    data.weekStartDate = weekStart;
+    await AsyncStorage.setItem(SHOP_KEY, JSON.stringify(data));
+  }
+  return data;
+}
+
+export async function setShopPurchases(data: ShopPurchaseData): Promise<void> {
+  await AsyncStorage.setItem(SHOP_KEY, JSON.stringify(data));
+}
+
+// --- Tower of Challenge (도전의 탑) ---
+const TOWER_KEY = "cat_tap_tower";
+
+export interface TowerData {
+  lastPlayDate: string;
+  playsToday: number;
+  floorDamage: number[];
+}
+
+export async function getTowerData(): Promise<TowerData> {
+  const v = await AsyncStorage.getItem(TOWER_KEY);
+  const data: TowerData = v ? JSON.parse(v) : {
+    lastPlayDate: "",
+    playsToday: 0,
+    floorDamage: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  };
+  const today = getTodayStr();
+  if (data.lastPlayDate !== today) {
+    data.playsToday = 0;
+    data.lastPlayDate = today;
+  }
+  while (data.floorDamage.length < 10) {
+    data.floorDamage.push(0);
+  }
+  return data;
+}
+
+export async function setTowerData(data: TowerData): Promise<void> {
+  await AsyncStorage.setItem(TOWER_KEY, JSON.stringify(data));
+}
+
+// --- Buff System ---
+const BUFF_KEY = "cat_tap_buff";
+
+export interface BuffData {
+  tapMultiplier: number;
+  buffExpiry: number;
+}
+
+export async function getActiveBuff(): Promise<BuffData> {
+  const v = await AsyncStorage.getItem(BUFF_KEY);
+  const data: BuffData = v ? JSON.parse(v) : { tapMultiplier: 1.0, buffExpiry: 0 };
+  if (data.buffExpiry > 0 && Date.now() > data.buffExpiry) {
+    data.tapMultiplier = 1.0;
+    data.buffExpiry = 0;
+    await AsyncStorage.setItem(BUFF_KEY, JSON.stringify(data));
+  }
+  return data;
+}
+
+export async function setActiveBuff(data: BuffData): Promise<void> {
+  await AsyncStorage.setItem(BUFF_KEY, JSON.stringify(data));
+}
+
+// --- Achievement Rewards ---
+const ACHIEVEMENT_REWARDS_KEY = "cat_tap_achievement_rewards";
+
+export async function getClaimedAchievementRewards(): Promise<string[]> {
+  const v = await AsyncStorage.getItem(ACHIEVEMENT_REWARDS_KEY);
+  return v ? JSON.parse(v) : [];
+}
+
+export async function claimAchievementReward(achievementId: string): Promise<string[]> {
+  const claimed = await getClaimedAchievementRewards();
+  if (!claimed.includes(achievementId)) {
+    claimed.push(achievementId);
+    await AsyncStorage.setItem(ACHIEVEMENT_REWARDS_KEY, JSON.stringify(claimed));
+  }
+  return claimed;
 }

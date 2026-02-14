@@ -47,11 +47,22 @@ const CHAPTERS: ChapterData[] = [
     requiredLevel: 1,
     image: STORY_IMAGES[1],
     paragraphs: [
-      "그날, 아무 일도 일어나지 않을 것 같던 폐허의 성당에 빛이 내려왔다.\n천장의 균열 사이로 떨어진 빛의 중심에서, 한 천사가 조용히 무릎을 꿇고 기도하고 있었다.",
-      "작은 몸, 흰 날개, 그리고 머리 위에 떠 있는 희미한 고리.\n그녀의 이름은 세라피였다.",
-      "기도를 마친 세라피가 눈을 뜨는 순간, 시선은 자연스럽게 플레이어가 서 있는 방향으로 향했다.\n말은 없었지만, 마치 오래전부터 이 만남을 알고 있었다는 듯한 눈빛이었다.",
-      "세라피는 이 세계의 빛이 점점 사라지고 있다는 사실을 알고 있었고,\n혼자서는 더 이상 그 빛을 지켜낼 수 없다는 것도 알고 있었다.",
-      "플레이어가 한 발 다가섰을 때, 세라피는 조용히 고개를 끄덕였다.\n그렇게 말 없는 동행이 시작된다.\n빛과 인간이 처음으로 같은 길을 걷기 시작한 순간이었다.",
+      "그날, 아무 일도 일어나지 않을 것 같던 폐허의 성당에 빛이 내려왔다.",
+      "천장의 균열 사이로 떨어진 빛줄기는 먼지를 타고 흘러내렸고, 그 중심에서 한 천사가 조용히 무릎을 꿇고 기도하고 있었다.",
+      "작은 몸, 흰 날개, 그리고 머리 위에 떠 있는 희미한 고리. 그녀의 이름은 세라피였다.",
+      "세라피의 기도는 소리 없이 이어졌다. 그녀의 입술이 움직일 때마다 주변의 공기가 미세하게 떨렸고, 빛은 더욱 짙어졌다.",
+      "성당 안은 고요했다. 누군가의 발소리도, 새의 지저귐도 들리지 않았다. 단지 빛과 천사만이 이 공간을 채우고 있었다.",
+      "기도를 마친 세라피가 천천히 눈을 떴다.",
+      "그 순간, 시선은 자연스럽게 플레이어가 서 있는 방향으로 향했다. 말은 없었지만, 마치 오래전부터 이 만남을 알고 있었다는 듯한 눈빛이었다.",
+      "세라피의 눈동자는 잔잔한 호수처럼 평온했다. 놀라지도, 두려워하지도 않았다. 단지 알고 있었다. 이 사람이 온다는 것을.",
+      "\"...기다리고 있었어요.\" 세라피가 작은 목소리로 말했다.",
+      "그녀는 천천히 일어났다. 날개가 가볍게 펄럭이며 먼지를 흩날렸다. 빛은 그녀를 따라 움직이는 것 같았다.",
+      "\"이 세계의 빛이 점점 사라지고 있어요. 어둠이 모든 것을 집어삼키기 전에, 저는 이곳에 내려왔습니다.\"",
+      "세라피의 목소리는 차분했지만, 그 안에는 깊은 슬픔이 배어 있었다.",
+      "\"혼자서는 더 이상 이 빛을 지켜낼 수 없다는 걸 알았어요. 그래서... 당신을 기다렸습니다.\"",
+      "플레이어가 한 발 다가섰을 때, 세라피는 조용히 고개를 끄덕였다.",
+      "그렇게 말 없는 동행이 시작된다.",
+      "빛과 인간이 처음으로 같은 길을 걷기 시작한 순간이었다.",
     ],
   },
   {
@@ -60,11 +71,22 @@ const CHAPTERS: ChapterData[] = [
     requiredLevel: 3,
     image: STORY_IMAGES[2],
     paragraphs: [
-      "여정이 시작되자 세라피는 더 이상 제단 위의 존재가 아니었다.\n그녀는 플레이어의 곁을 따라 걸으며, 어둠에 잠긴 세상을 하나씩 마주했다.",
-      "폐허가 된 마을에서, 사람들의 흔적만 남은 거리에서,\n세라피는 자주 걸음을 멈추고 하늘을 올려다보았다.\n빛이 사라진 이유를, 그리고 자신이 내려온 의미를 스스로에게 묻는 듯했다.",
-      "어둠이 짙어진 순간, 세라피는 망설임 없이 날개를 펼쳤다.\n플레이어를 향해 손을 내밀며, 작지만 분명한 목소리로 말했다.",
-      "\"혼자가 아니면… 더 멀리 갈 수 있어요.\"",
-      "그 손을 잡는 순간, 세라피의 빛은 조금 더 강해졌다.\n이 동행은 보호가 아니라 서로를 의지하는 관계라는 사실을,\n그녀는 이미 알고 있었다.",
+      "여정이 시작되자 세라피는 더 이상 제단 위의 존재가 아니었다.",
+      "그녀는 플레이어의 곁을 따라 걸으며, 어둠에 잠긴 세상을 하나씩 마주했다.",
+      "첫 번째 마을은 폐허였다. 부서진 건물들 사이로 바람이 스쳐 지나갔고, 사람들의 흔적만이 희미하게 남아있었다.",
+      "세라피는 그곳에서 자주 걸음을 멈췄다. 하늘을 올려다보며, 무언가를 생각하는 듯했다.",
+      "\"이곳에도 사람들이 살았어요.\" 세라피가 조용히 말했다. \"웃음소리로 가득했던 거리였는데...\"",
+      "그녀의 목소리는 떨렸다. 빛이 사라진 이유를, 그리고 자신이 내려온 의미를 스스로에게 묻는 듯했다.",
+      "\"제가 더 일찍 왔더라면, 이들을 지킬 수 있었을까요?\" 세라피가 플레이어를 바라보며 물었다.",
+      "대답 대신, 플레이어는 그저 그녀의 곁에 서 있었다. 그것만으로도 세라피는 조금 안도하는 것 같았다.",
+      "해가 지고, 어둠이 짙어졌다.",
+      "그 순간, 어둠 속에서 무언가가 움직였다. 그림자가 형체를 갖추며 다가왔다.",
+      "세라피는 망설임 없이 날개를 펼쳤다. 빛이 사방으로 퍼져나가며 어둠을 밀어냈다.",
+      "하지만 어둠은 집요했다. 빛이 닿지 않는 곳에서 계속해서 기어나왔다.",
+      "\"혼자서는... 부족해요.\" 세라피가 숨을 헐떡이며 말했다.",
+      "플레이어가 다가가자, 세라피는 손을 내밀었다. \"혼자가 아니면… 더 멀리 갈 수 있어요.\"",
+      "그 손을 잡는 순간, 세라피의 빛은 조금 더 강해졌다. 플레이어의 온기가 그녀에게 전해졌다.",
+      "이 동행은 보호가 아니라 서로를 의지하는 관계라는 사실을, 그녀는 이미 알고 있었다.",
     ],
   },
   {
@@ -73,11 +95,23 @@ const CHAPTERS: ChapterData[] = [
     requiredLevel: 5,
     image: STORY_IMAGES[3],
     paragraphs: [
-      "빛이 닿지 않는 땅에서, 세라피의 노래는 처음으로 흔들리기 시작했다.\n정화되지 않은 어둠은 공간에 균열을 만들고, 그 균열은 세라피의 힘을 잠식했다.",
-      "그녀는 무대를 만들지 못했다.\n노래는 끊기고, 날개는 무겁게 처졌다.",
-      "플레이어가 다가가자, 세라피는 고개를 숙였다.\n자신의 힘이 부족하다는 것을 인정하는 듯한 표정이었다.",
-      "그러나 그 순간, 세라피는 깨달았다.\n지금까지의 노래는 세상을 향한 것이었지만,\n이번 노래는 한 사람을 향한 것이어야 한다는 것을.",
-      "플레이어의 존재를 느끼며, 세라피는 다시 노래를 부른다.\n빛은 완전하지 않았지만, 균열은 조금씩 봉합되기 시작했다.\n\n그날 이후, 세라피의 노래는 혼자가 아닌 둘의 노래가 되었다.",
+      "빛이 닿지 않는 땅. 그곳은 어둠이 지배하는 곳이었다.",
+      "세라피와 플레이어는 그 경계에 섰다. 앞으로 나아갈수록 공기는 무거워지고, 빛은 희미해졌다.",
+      "\"이곳은... 너무 깊이 잠식되었어요.\" 세라피가 말했다. 그녀의 목소리에는 긴장이 묻어났다.",
+      "정화되지 않은 어둠은 공간에 균열을 만들었다. 공간이 뒤틀리고, 현실이 왜곡되었다.",
+      "세라피는 노래를 시작했다. 천사의 노래, 빛을 불러오는 선율.",
+      "하지만 노래는 제대로 울리지 않았다. 균열이 소리를 삼키고, 빛을 막았다.",
+      "세라피의 노래는 처음으로 흔들리기 시작했다.",
+      "그녀의 날개가 무겁게 처졌다. 빛의 고리가 희미해졌다.",
+      "\"미안해요...\" 세라피가 작게 중얼거렸다. \"저는... 생각보다 약한 것 같아요.\"",
+      "플레이어가 다가가자, 세라피는 고개를 숙였다. 자신의 힘이 부족하다는 것을 인정하는 듯한 표정이었다.",
+      "그러나 그 순간, 세라피는 깨달았다.",
+      "지금까지의 노래는 세상을 향한 것이었다. 넓고, 크고, 모든 것을 아우르려 했던 노래.",
+      "하지만 이번에는 달라야 했다. 이번 노래는 한 사람을 향한 것이어야 했다.",
+      "세라피는 플레이어를 바라보았다. 그리고 다시 노래를 시작했다.",
+      "이번에는 작았다. 하지만 진심이 담겨 있었다.",
+      "빛은 완전하지 않았다. 균열을 완전히 메우지도 못했다. 하지만 조금씩, 천천히 봉합되기 시작했다.",
+      "그날 이후, 세라피의 노래는 혼자가 아닌 둘의 노래가 되었다.",
     ],
   },
   {
@@ -86,11 +120,22 @@ const CHAPTERS: ChapterData[] = [
     requiredLevel: 7,
     image: STORY_IMAGES[4],
     paragraphs: [
-      "여정의 끝에서, 세라피는 선택을 강요받는다.\n이 세계를 완전히 정화하려면, 더 이상 하늘의 존재로 남아 있을 수 없다는 진실.",
-      "빛을 지키기 위해, 그녀는 날개를 잃어야 했다.",
-      "세라피는 처음으로 두려움을 드러냈다.\n하늘로 돌아갈 수 없을지도 모른다는 불안,\n그리고 플레이어 곁을 떠나야 할지도 모른다는 공포.",
-      "하지만 선택의 순간, 세라피는 날개를 펼치지 않았다.\n대신 플레이어의 가까이에 서서 조용히 말했다.",
-      "\"이제는… 같은 높이에서 걷고 싶어요.\"\n\n빛은 줄어들었지만, 세라피는 더 이상 흔들리지 않았다.\n그녀는 천사가 아니라, 동행자가 되기를 선택했다.",
+      "여정의 끝이 보였다. 마지막 어둠의 근원지. 그곳에 도착했을 때, 세라피는 멈춰 섰다.",
+      "\"이곳을 정화하면... 모든 게 끝나요.\" 그녀가 말했다.",
+      "하지만 그녀의 목소리에는 기쁨이 없었다. 오히려 슬픔이 배어 있었다.",
+      "\"이 세계를 완전히 정화하려면...\" 세라피가 말을 잇지 못했다.",
+      "하늘에서 목소리가 들려왔다. 천상의 목소리. 그것은 세라피에게 선택을 강요했다.",
+      "\"날개를 포기하라. 더 이상 하늘의 존재로 남아있을 수 없다.\"",
+      "빛을 지키기 위해, 그녀는 날개를 잃어야 했다. 천사로서의 자신을 버려야 했다.",
+      "세라피는 처음으로 두려움을 드러냈다.",
+      "\"하늘로... 돌아갈 수 없을지도 몰라요.\" 그녀가 떨리는 목소리로 말했다.",
+      "플레이어를 바라보는 세라피의 눈에는 눈물이 맺혔다. \"그리고 당신 곁을 떠나야 할지도...\"",
+      "하지만 선택의 순간, 세라피는 망설이지 않았다.",
+      "그녀는 날개를 펼치지 않았다. 대신 플레이어의 가까이에 섰다.",
+      "\"이제는… 같은 높이에서 걷고 싶어요.\"",
+      "빛의 고리가 사라졌다. 날개가 빛으로 흩어졌다. 세라피의 빛은 줄어들었다.",
+      "하지만 세라피는 더 이상 흔들리지 않았다.",
+      "그녀는 천사가 아니라, 동행자가 되기를 선택했다.",
     ],
   },
   {
@@ -99,11 +144,22 @@ const CHAPTERS: ChapterData[] = [
     requiredLevel: 10,
     image: STORY_IMAGES[5],
     paragraphs: [
-      "모든 여정이 끝난 밤, 작은 모닥불 앞에서 세라피는 조용히 앉아 있었다.\n하늘에는 별이 떠 있고, 멀리 마을의 불빛이 흔들리고 있었다.",
-      "세라피는 플레이어의 곁으로 다가와,\n아무 말 없이 머리에 손을 얹었다.",
+      "모든 여정이 끝난 밤.",
+      "작은 모닥불 앞에서 세라피는 조용히 앉아 있었다.",
+      "하늘에는 별이 떠 있고, 멀리 마을의 불빛이 흔들리고 있었다.",
+      "세라피는 이제 천사가 아니었다. 날개도, 고리도 없었다. 하지만 그녀는 행복해 보였다.",
+      "\"이상하죠.\" 세라피가 웃으며 말했다. \"날개를 잃었는데, 더 자유로운 것 같아요.\"",
+      "모닥불의 불빛이 그녀의 얼굴을 비췄다. 따뜻하고, 부드러운 빛.",
+      "세라피는 플레이어의 곁으로 다가왔다.",
+      "아무 말 없이, 조용히 머리에 손을 얹었다.",
       "\"당신이 있어서… 저는 사라지지 않았어요.\"",
-      "그녀의 빛은 더 이상 눈부시지 않았다.\n하지만 그 빛은, 플레이어가 어디에 있든 함께 머무는 빛이었다.",
-      "세라피는 웃었다.\n천사로서가 아니라, 누군가의 곁에 있는 존재로서.\n\n그 순간, 이 여정의 진짜 의미가 완성된다.\n세계를 구한 이야기가 아니라,\n서로를 선택한 이야기로.",
+      "그녀의 빛은 더 이상 눈부시지 않았다.",
+      "하지만 그 빛은, 플레이어가 어디에 있든 함께 머무는 빛이었다.",
+      "\"함께 걸어줘서 고마워요.\" 세라피가 속삭였다.",
+      "\"앞으로도... 계속 함께 있어줄 거죠?\"",
+      "세라피는 웃었다. 천사로서가 아니라, 누군가의 곁에 있는 존재로서.",
+      "그 순간, 이 여정의 진짜 의미가 완성된다.",
+      "세계를 구한 이야기가 아니라, 서로를 선택한 이야기로.",
     ],
   },
 ];
@@ -112,7 +168,7 @@ const CHAPTER_REWARDS: Record<number, number> = { 1: 100, 2: 100, 3: 100, 4: 100
 
 export default function AffinityModal({ visible, onClose, catId, catName, onReward }: Props) {
   const [affinity, setAffinityState] = useState<storage.AffinityData>({
-    level: 0, xp: 0, readChapters: [], unlockedSpecial: false,
+    level: 0, xp: 0, readChapters: [], claimedRewards: [], unlockedSpecial: false,
   });
   const [phase, setPhase] = useState<"main" | "story" | "gallery">("main");
   const [currentChapter, setCurrentChapter] = useState<ChapterData | null>(null);
@@ -159,25 +215,31 @@ export default function AffinityModal({ visible, onClose, catId, catName, onRewa
       setParagraphIdx((p) => p + 1);
       animateText();
     } else {
-      // Mark chapter as read & give reward
-      const updated = { ...affinity, readChapters: [...affinity.readChapters] };
+      // Mark chapter as read
+      const updated = { ...affinity, readChapters: [...affinity.readChapters], claimedRewards: [...affinity.claimedRewards] };
       const isFirstRead = !updated.readChapters.includes(currentChapter.chapter);
       if (isFirstRead) {
         updated.readChapters.push(currentChapter.chapter);
         await storage.setAffinity(catId, updated);
         setAffinityState(updated);
-        const reward = CHAPTER_REWARDS[currentChapter.chapter] ?? 100;
-        onReward?.(reward);
-        setRewardPopup(reward);
-        setTimeout(() => setRewardPopup(null), 2500);
       }
       setPhase("main");
     }
-  }, [currentChapter, paragraphIdx, affinity, catId, animateText, onReward]);
+  }, [currentChapter, paragraphIdx, affinity, catId, animateText]);
+
+  const handleClaimReward = useCallback(async (chapterNum: number) => {
+    const reward = CHAPTER_REWARDS[chapterNum] ?? 100;
+    const updated = { ...affinity, claimedRewards: [...affinity.claimedRewards, chapterNum] };
+    await storage.setAffinity(catId, updated);
+    setAffinityState(updated);
+    onReward?.(reward);
+    setRewardPopup(reward);
+    setTimeout(() => setRewardPopup(null), 2500);
+  }, [affinity, catId, onReward]);
 
   const handleUnlockSpecial = useCallback(async () => {
     if (affinity.level >= 10 && !affinity.unlockedSpecial) {
-      const updated = { ...affinity, unlockedSpecial: true, readChapters: [...affinity.readChapters] };
+      const updated = { ...affinity, unlockedSpecial: true, readChapters: [...affinity.readChapters], claimedRewards: [...affinity.claimedRewards] };
       await storage.setAffinity(catId, updated);
       setAffinityState(updated);
     }
@@ -264,26 +326,34 @@ export default function AffinityModal({ visible, onClose, catId, catName, onRewa
             {CHAPTERS.map((ch) => {
               const unlocked = affinity.level >= ch.requiredLevel;
               const read = affinity.readChapters.includes(ch.chapter);
+              const claimed = affinity.claimedRewards.includes(ch.chapter);
+              const canClaim = read && !claimed;
               return (
-                <Pressable
-                  key={ch.chapter}
-                  style={[s.chapterBtn, !unlocked && s.chapterLocked]}
-                  onPress={() => unlocked && startChapter(ch)}
-                  disabled={!unlocked}
-                >
-                  <View style={s.chapterLeft}>
-                    <Text style={s.chapterNum}>{unlocked ? `Ch.${ch.chapter}` : "🔒"}</Text>
-                    <View>
-                      <Text style={s.chapterTitle}>
-                        {unlocked ? ch.title : "???"}
-                      </Text>
-                      <Text style={s.chapterReq}>
-                        {unlocked ? (read ? "읽음" : "새로운 이야기") : `애정도 Lv.${ch.requiredLevel} 필요`}
-                      </Text>
+                <View key={ch.chapter} style={s.chapterRow}>
+                  <Pressable
+                    style={[s.chapterBtn, !unlocked && s.chapterLocked]}
+                    onPress={() => unlocked && startChapter(ch)}
+                    disabled={!unlocked}
+                  >
+                    <View style={s.chapterLeft}>
+                      <Text style={s.chapterNum}>{unlocked ? `Ch.${ch.chapter}` : "🔒"}</Text>
+                      <View>
+                        <Text style={s.chapterTitle}>
+                          {unlocked ? ch.title : "???"}
+                        </Text>
+                        <Text style={s.chapterReq}>
+                          {unlocked ? (read ? (claimed ? "보상 수령 완료" : "읽음") : "새로운 이야기") : `애정도 Lv.${ch.requiredLevel} 필요`}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                  {unlocked && !read && <View style={s.newBadge}><Text style={s.newBadgeText}>NEW</Text></View>}
-                </Pressable>
+                    {unlocked && !read && <View style={s.newBadge}><Text style={s.newBadgeText}>NEW</Text></View>}
+                  </Pressable>
+                  {canClaim && (
+                    <Pressable style={s.rewardClaimBtn} onPress={() => handleClaimReward(ch.chapter)}>
+                      <Text style={s.rewardClaimText}>💰 {CHAPTER_REWARDS[ch.chapter]}</Text>
+                    </Pressable>
+                  )}
+                </View>
               );
             })}
 
@@ -428,8 +498,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 14,
-    width: "100%",
-    marginBottom: 8,
+    flex: 1,
     borderWidth: 1,
     borderColor: "rgba(255,100,150,0.15)",
   },
@@ -467,6 +536,29 @@ const s = StyleSheet.create({
   newBadgeText: {
     color: "#fff",
     fontSize: 10,
+    fontWeight: "bold",
+  },
+  // Chapter row with reward button
+  chapterRow: {
+    width: "100%",
+    marginBottom: 8,
+    flexDirection: "row",
+    gap: 8,
+  },
+  rewardClaimBtn: {
+    backgroundColor: "rgba(255,193,7,0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255,193,7,0.4)",
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 80,
+  },
+  rewardClaimText: {
+    color: "#FFC107",
+    fontSize: 13,
     fontWeight: "bold",
   },
   // Special
