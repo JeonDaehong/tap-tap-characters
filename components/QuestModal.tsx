@@ -17,22 +17,23 @@ interface QuestDef {
   target: number;
   rewardCoins: number;
   rewardMedals: number;
+  rewardXp: number;
 }
 
 const DAILY_QUESTS: QuestDef[] = [
-  { icon: "👆", title: "탭 100회", target: 100, rewardCoins: 50, rewardMedals: 0 },
-  { icon: "🎰", title: "캐릭터 뽑기 3회", target: 3, rewardCoins: 100, rewardMedals: 0 },
-  { icon: "🎮", title: "미니게임 참여", target: 1, rewardCoins: 50, rewardMedals: 0 },
-  { icon: "🪙", title: "코인 500 획득", target: 500, rewardCoins: 0, rewardMedals: 30 },
-  { icon: "🏅", title: "모든 일일 과제 완료", target: 1, rewardCoins: 200, rewardMedals: 50 },
+  { icon: "👆", title: "탭 100회", target: 100, rewardCoins: 50, rewardMedals: 0, rewardXp: 30 },
+  { icon: "🎰", title: "캐릭터 뽑기 3회", target: 3, rewardCoins: 100, rewardMedals: 0, rewardXp: 50 },
+  { icon: "🎮", title: "미니게임 참여", target: 1, rewardCoins: 50, rewardMedals: 0, rewardXp: 30 },
+  { icon: "🪙", title: "코인 500 획득", target: 500, rewardCoins: 0, rewardMedals: 30, rewardXp: 50 },
+  { icon: "🏅", title: "모든 일일 과제 완료", target: 1, rewardCoins: 200, rewardMedals: 50, rewardXp: 200 },
 ];
 
 const WEEKLY_QUESTS: QuestDef[] = [
-  { icon: "👆", title: "탭 3000회", target: 3000, rewardCoins: 300, rewardMedals: 0 },
-  { icon: "🎰", title: "캐릭터 뽑기 20회", target: 20, rewardCoins: 500, rewardMedals: 0 },
-  { icon: "⚔️", title: "강화 3회 성공", target: 3, rewardCoins: 0, rewardMedals: 100 },
-  { icon: "🎮", title: "미니게임 5회 참여", target: 5, rewardCoins: 200, rewardMedals: 0 },
-  { icon: "🏅", title: "모든 주간 과제 완료", target: 1, rewardCoins: 1000, rewardMedals: 200 },
+  { icon: "👆", title: "탭 3000회", target: 3000, rewardCoins: 300, rewardMedals: 0, rewardXp: 200 },
+  { icon: "🎰", title: "캐릭터 뽑기 20회", target: 20, rewardCoins: 500, rewardMedals: 0, rewardXp: 300 },
+  { icon: "⚔️", title: "강화 3회 성공", target: 3, rewardCoins: 0, rewardMedals: 100, rewardXp: 200 },
+  { icon: "🎮", title: "미니게임 5회 참여", target: 5, rewardCoins: 200, rewardMedals: 0, rewardXp: 150 },
+  { icon: "🏅", title: "모든 주간 과제 완료", target: 1, rewardCoins: 1000, rewardMedals: 200, rewardXp: 1000 },
 ];
 
 // ── Helper: get current progress value for a quest ──────────────────────────
@@ -76,6 +77,7 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onReward: (coins: number, medals: number) => void;
+  onRewardXp: (xp: number) => void;
   onClaimQuest: (questType: "daily" | "weekly", index: number) => void;
   questProgress: QuestProgress;
 }
@@ -86,6 +88,7 @@ export default function QuestModal({
   visible,
   onClose,
   onReward,
+  onRewardXp,
   onClaimQuest,
   questProgress,
 }: Props) {
@@ -110,6 +113,7 @@ export default function QuestModal({
     const quest = quests[index];
     onClaimQuest(activeTab, index);
     onReward(quest.rewardCoins, quest.rewardMedals);
+    if (quest.rewardXp > 0) onRewardXp(quest.rewardXp);
   };
 
   // ── Reward label ──────────────────────────────────────────────────────────
@@ -117,6 +121,7 @@ export default function QuestModal({
     const parts: string[] = [];
     if (q.rewardCoins > 0) parts.push(`${q.rewardCoins} 코인`);
     if (q.rewardMedals > 0) parts.push(`${q.rewardMedals} 황금`);
+    if (q.rewardXp > 0) parts.push(`${q.rewardXp} XP`);
     return parts.join(" + ");
   };
 

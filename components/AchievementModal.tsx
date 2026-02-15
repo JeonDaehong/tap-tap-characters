@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -8,14 +8,42 @@ import {
   StyleSheet,
 } from "react-native";
 import { ALL_ACHIEVEMENTS } from "../data/achievements";
+import * as storage from "../utils/storage";
 
 interface Props {
   visible: boolean;
   unlocked: string[];
   onClose: () => void;
+  onClaimReward: (coins: number, medals: number, xp: number) => void;
 }
 
-export default function AchievementModal({ visible, unlocked, onClose }: Props) {
+export default function AchievementModal({ visible, unlocked, onClose, onClaimReward }: Props) {
+  const [claimedRewards, setClaimedRewards] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    (async () => {
+      const claimed = await storage.getClaimedAchievementRewards();
+      setClaimedRewards(claimed);
+    })();
+  }, [visible]);
+
+  const handleClaim = async (achId: string) => {
+    const ach = ALL_ACHIEVEMENTS.find(a => a.id === achId);
+    if (!ach) return;
+    const updated = await storage.claimAchievementReward(achId);
+    setClaimedRewards(updated);
+    onClaimReward(ach.rewardCoins, ach.rewardMedals, ach.rewardXp);
+  };
+
+  const rewardLabel = (coins: number, medals: number, xp: number): string => {
+    const parts: string[] = [];
+    if (coins > 0) parts.push(`${coins} 코인`);
+    if (medals > 0) parts.push(`${medals} 황금`);
+    if (xp > 0) parts.push(`${xp} XP`);
+    return parts.join(" + ");
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={s.overlay}>
@@ -26,8 +54,11 @@ export default function AchievementModal({ visible, unlocked, onClose }: Props) 
           </Text>
 
           <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
-            {ALL_ACHIEVEMENTS.map((ach, i) => {
+            {ALL_ACHIEVEMENTS.map((ach) => {
               const isUnlocked = unlocked.includes(ach.id);
+              const isClaimed = claimedRewards.includes(ach.id);
+              const canClaim = isUnlocked && !isClaimed;
+
               return (
                 <View key={ach.id} style={[s.item, isUnlocked && s.itemUnlocked]}>
                   <Text style={s.itemIcon}>{isUnlocked ? ach.icon : "❓"}</Text>
@@ -38,8 +69,23 @@ export default function AchievementModal({ visible, unlocked, onClose }: Props) 
                     {isUnlocked && (
                       <Text style={s.itemDesc}>{ach.description}</Text>
                     )}
+                    {isUnlocked && (
+                      <Text style={s.rewardText}>
+                        🎁 {rewardLabel(ach.rewardCoins, ach.rewardMedals, ach.rewardXp)}
+                      </Text>
+                    )}
                   </View>
-                  {isUnlocked && <Text style={s.checkmark}>✅</Text>}
+                  <View style={s.claimWrap}>
+                    {isClaimed ? (
+                      <Text style={s.checkmark}>✅</Text>
+                    ) : canClaim ? (
+                      <Pressable style={s.claimBtn} onPress={() => handleClaim(ach.id)}>
+                        <Text style={s.claimBtnText}>받기</Text>
+                      </Pressable>
+                    ) : (
+                      <Text style={s.lockIcon}>🔒</Text>
+                    )}
+                  </View>
                 </View>
               );
             })}
@@ -67,6 +113,8 @@ const s = StyleSheet.create({
     padding: 20,
     width: "90%",
     maxHeight: "80%",
+    borderWidth: 2,
+    borderColor: "#FFD700",
   },
   title: {
     color: "#FFD700",
@@ -118,9 +166,32 @@ const s = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
+  rewardText: {
+    color: "#FFD700",
+    fontSize: 11,
+    marginTop: 3,
+  },
+  claimWrap: {
+    width: 50,
+    alignItems: "center",
+  },
   checkmark: {
     fontSize: 18,
-    marginLeft: 8,
+  },
+  lockIcon: {
+    fontSize: 16,
+    opacity: 0.4,
+  },
+  claimBtn: {
+    backgroundColor: "#FFD700",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  claimBtnText: {
+    color: "#1a1a2e",
+    fontSize: 13,
+    fontWeight: "bold",
   },
   closeBtn: {
     marginTop: 12,

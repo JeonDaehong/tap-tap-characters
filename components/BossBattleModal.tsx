@@ -20,41 +20,49 @@ interface Props {
   enhanceLevel: number;
 }
 
-interface BossStage {
+interface TowerFloor {
   name: string;
   emoji: string;
   hp: number;
-  timeLimit: number; // seconds
   rewardCoins: number;
   rewardMedals: number;
 }
 
-const BOSS_STAGES: BossStage[] = [
-  { name: "고블린 대장", emoji: "👺", hp: 250, timeLimit: 30, rewardCoins: 100, rewardMedals: 0 },
-  { name: "오우거 킹", emoji: "👹", hp: 625, timeLimit: 25, rewardCoins: 200, rewardMedals: 5 },
-  { name: "드래곤 로드", emoji: "🐉", hp: 1250, timeLimit: 20, rewardCoins: 400, rewardMedals: 15 },
-  { name: "타이탄 제왕", emoji: "⚡", hp: 3750, timeLimit: 18, rewardCoins: 800, rewardMedals: 30 },
-  { name: "신계의 지배자", emoji: "🌟", hp: 11250, timeLimit: 15, rewardCoins: 1600, rewardMedals: 60 },
+const TOWER_FLOORS: TowerFloor[] = [
+  { name: "고블린 대장", emoji: "👺", hp: 5000, rewardCoins: 100, rewardMedals: 0 },
+  { name: "오우거 킹", emoji: "👹", hp: 12500, rewardCoins: 200, rewardMedals: 5 },
+  { name: "드래곤 로드", emoji: "🐉", hp: 25000, rewardCoins: 400, rewardMedals: 15 },
+  { name: "타이탄 제왕", emoji: "⚡", hp: 50000, rewardCoins: 800, rewardMedals: 30 },
+  { name: "신계의 지배자", emoji: "🌟", hp: 100000, rewardCoins: 1600, rewardMedals: 60 },
+  { name: "심해의 군주", emoji: "🌊", hp: 200000, rewardCoins: 3200, rewardMedals: 100 },
+  { name: "화염의 왕", emoji: "🔥", hp: 400000, rewardCoins: 6400, rewardMedals: 150 },
+  { name: "얼음의 여왕", emoji: "❄️", hp: 800000, rewardCoins: 12800, rewardMedals: 200 },
+  { name: "혼돈의 마왕", emoji: "💀", hp: 1600000, rewardCoins: 25600, rewardMedals: 300 },
+  { name: "태초의 신", emoji: "✨", hp: 3200000, rewardCoins: 51200, rewardMedals: 500 },
 ];
 
 const GRADE_DAMAGE: Record<CatGrade, number> = {
   C: 1, B: 2, A: 3, S: 5, SS: 8, SSS: 15,
 };
 
-const MAX_PLAYS_PER_DAY = 3;
+const MAX_PLAYS_PER_DAY = 2;
+const BATTLE_TIME = 30;
 
 export default function BossBattleModal({ visible, onClose, onReward, selectedGrade, enhanceLevel }: Props) {
-  const [bossData, setBossData] = useState<storage.BossData | null>(null);
+  const [towerData, setTowerDataState] = useState<storage.TowerData | null>(null);
   const [phase, setPhase] = useState<"select" | "battle" | "result">("select");
-  const [selectedStage, setSelectedStage] = useState(0);
-  const [bossHp, setBossHp] = useState(0);
-  const [maxHp, setMaxHp] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [currentFloor, setCurrentFloor] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(BATTLE_TIME);
   const [damageDealt, setDamageDealt] = useState(0);
-  const [victory, setVictory] = useState(false);
   const [comboCount, setComboCount] = useState(0);
   const [showDmg, setShowDmg] = useState(false);
+  const [clearedFloors, setClearedFloors] = useState<number[]>([]);
+  const [totalRewardCoins, setTotalRewardCoins] = useState(0);
+  const [totalRewardMedals, setTotalRewardMedals] = useState(0);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const towerRef = useRef<storage.TowerData | null>(null);
+  const currentFloorRef = useRef(0);
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const dmgOpacity = useRef(new Animated.Value(0)).current;
   const dmgTranslateY = useRef(new Animated.Value(0)).current;
@@ -63,11 +71,14 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
   useEffect(() => {
     if (!visible) return;
     (async () => {
-      const data = await storage.getBossData();
-      setBossData(data);
+      const data = await storage.getTowerData();
+      setTowerDataState(data);
+      towerRef.current = data;
       setPhase("select");
-      setVictory(false);
       setDamageDealt(0);
+      setClearedFloors([]);
+      setTotalRewardCoins(0);
+      setTotalRewardMedals(0);
     })();
   }, [visible]);
 
@@ -79,25 +90,34 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
 
   const getDamage = useCallback(() => {
     if (!selectedGrade) return 1;
-    const base = GRADE_DAMAGE[selectedGrade];
-    // Enhancement bonus: +1.5 damage per enhancement level
-    return base + Math.floor(enhanceLevel * 1.5);
+    return GRADE_DAMAGE[selectedGrade] + Math.floor(enhanceLevel * 1.5);
   }, [selectedGrade, enhanceLevel]);
 
-  const startBattle = useCallback(async (stageIdx: number) => {
-    if (!bossData || bossData.playsToday >= MAX_PLAYS_PER_DAY) return;
-    const stage = BOSS_STAGES[stageIdx];
-    setSelectedStage(stageIdx);
-    setBossHp(stage.hp);
-    setMaxHp(stage.hp);
-    setTimeLeft(stage.timeLimit);
+  const getFirstUncleared = useCallback((): number => {
+    if (!towerRef.current) return 0;
+    for (let i = 0; i < 10; i++) {
+      if (towerRef.current.floorDamage[i] < TOWER_FLOORS[i].hp) return i;
+    }
+    return 9;
+  }, []);
+
+  const startBattle = useCallback(async () => {
+    if (!towerRef.current || towerRef.current.playsToday >= MAX_PLAYS_PER_DAY) return;
+    const floor = getFirstUncleared();
+    setCurrentFloor(floor);
+    currentFloorRef.current = floor;
+    setTimeLeft(BATTLE_TIME);
     setDamageDealt(0);
     setComboCount(0);
+    setClearedFloors([]);
+    setTotalRewardCoins(0);
+    setTotalRewardMedals(0);
     setPhase("battle");
 
-    const updated = { ...bossData, playsToday: bossData.playsToday + 1 };
-    await storage.setBossData(updated);
-    setBossData(updated);
+    const updated = { ...towerRef.current, playsToday: towerRef.current.playsToday + 1 };
+    towerRef.current = updated;
+    setTowerDataState(updated);
+    await storage.setTowerData(updated);
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -105,13 +125,12 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
           if (timerRef.current) clearInterval(timerRef.current);
           timerRef.current = null;
           setPhase("result");
-          setVictory(false);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [bossData]);
+  }, [getFirstUncleared]);
 
   const handleBossTap = useCallback(() => {
     if (phase !== "battle") return;
@@ -119,7 +138,7 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
     setComboCount((prev) => prev + 1);
     setDamageDealt((prev) => prev + dmg);
 
-    // Shake animation
+    // Shake
     shakeAnim.setValue(0);
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 6, duration: 30, useNativeDriver: true }),
@@ -127,11 +146,10 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
       Animated.timing(shakeAnim, { toValue: 0, duration: 30, useNativeDriver: true }),
     ]).start();
 
-    // Boss flinch
     bossScale.setValue(0.95);
     Animated.spring(bossScale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
 
-    // Damage popup
+    // Dmg popup
     setShowDmg(true);
     dmgOpacity.setValue(1);
     dmgTranslateY.setValue(0);
@@ -140,31 +158,39 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
       Animated.timing(dmgTranslateY, { toValue: -30, duration: 600, useNativeDriver: true }),
     ]).start(() => setShowDmg(false));
 
-    setBossHp((prev) => {
-      const newHp = prev - dmg;
-      if (newHp <= 0) {
+    // Apply damage
+    if (!towerRef.current) return;
+    const floorIdx = currentFloorRef.current;
+    const floor = TOWER_FLOORS[floorIdx];
+    if (!floor) return;
+
+    towerRef.current.floorDamage[floorIdx] += dmg;
+
+    if (towerRef.current.floorDamage[floorIdx] >= floor.hp) {
+      // Floor cleared!
+      towerRef.current.floorDamage[floorIdx] = floor.hp;
+      setClearedFloors((prev) => [...prev, floorIdx]);
+      setTotalRewardCoins((prev) => prev + floor.rewardCoins);
+      setTotalRewardMedals((prev) => prev + floor.rewardMedals);
+      onReward(floor.rewardCoins, floor.rewardMedals);
+
+      // Auto-advance to next floor
+      if (floorIdx < 9) {
+        const next = floorIdx + 1;
+        setCurrentFloor(next);
+        currentFloorRef.current = next;
+      } else {
+        // All floors cleared!
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
-        setVictory(true);
         setPhase("result");
-
-        // Update highest stage
-        (async () => {
-          const data = await storage.getBossData();
-          if (selectedStage + 1 > data.highestStage) {
-            data.highestStage = selectedStage + 1;
-            await storage.setBossData(data);
-            setBossData(data);
-          }
-        })();
-
-        const stage = BOSS_STAGES[selectedStage];
-        onReward(stage.rewardCoins, stage.rewardMedals);
-        return 0;
       }
-      return newHp;
-    });
-  }, [phase, getDamage, selectedStage, onReward]);
+    }
+
+    // Save periodically
+    storage.setTowerData(towerRef.current);
+    setTowerDataState({ ...towerRef.current });
+  }, [phase, getDamage, onReward]);
 
   const handleClose = useCallback(() => {
     if (timerRef.current) {
@@ -174,7 +200,10 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
     onClose();
   }, [onClose]);
 
-  const hpPercent = maxHp > 0 ? Math.max(0, bossHp / maxHp) * 100 : 0;
+  const floor = TOWER_FLOORS[currentFloor];
+  const currentDmg = towerData?.floorDamage[currentFloor] ?? 0;
+  const remainHp = floor ? Math.max(0, floor.hp - currentDmg) : 0;
+  const hpPercent = floor ? Math.max(0, (remainHp / floor.hp) * 100) : 0;
   const hpColor = hpPercent > 50 ? "#4CFF4C" : hpPercent > 20 ? "#FFA500" : "#FF4444";
 
   return (
@@ -184,38 +213,56 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
           {phase === "select" && (
             <>
-              <Text style={s.title}>⚔️ 보스 도전</Text>
+              <Text style={s.title}>🏰 도전의 탑</Text>
               <View style={s.divider} />
 
-              {bossData && (
+              {towerData && (
                 <Text style={s.playsLeft}>
-                  남은 횟수: {Math.max(0, MAX_PLAYS_PER_DAY - bossData.playsToday)}/{MAX_PLAYS_PER_DAY}
+                  남은 횟수: {Math.max(0, MAX_PLAYS_PER_DAY - towerData.playsToday)}/{MAX_PLAYS_PER_DAY}
                 </Text>
               )}
 
-              {BOSS_STAGES.map((stage, i) => {
-                const unlocked = !bossData || i <= bossData.highestStage;
-                const canPlay = bossData && bossData.playsToday < MAX_PLAYS_PER_DAY && unlocked;
+              {TOWER_FLOORS.map((fl, i) => {
+                const dmgDone = towerData?.floorDamage[i] ?? 0;
+                const cleared = dmgDone >= fl.hp;
+                const firstUncleared = getFirstUncleared();
+                const unlocked = i <= firstUncleared;
+                const canPlay = towerData && towerData.playsToday < MAX_PLAYS_PER_DAY && i === firstUncleared;
+                const floorHpPct = Math.min((dmgDone / fl.hp) * 100, 100);
+
                 return (
-                  <Pressable
-                    key={i}
-                    style={[s.stageBtn, !canPlay && s.stageBtnLocked]}
-                    onPress={() => canPlay && startBattle(i)}
-                    disabled={!canPlay}
-                  >
-                    <Text style={s.stageEmoji}>{unlocked ? stage.emoji : "🔒"}</Text>
+                  <View key={i} style={[s.stageBtn, !unlocked && s.stageBtnLocked, cleared && s.stageBtnCleared]}>
+                    <Text style={s.stageEmoji}>{cleared ? "✅" : unlocked ? fl.emoji : "🔒"}</Text>
                     <View style={s.stageInfo}>
-                      <Text style={s.stageName}>{unlocked ? stage.name : "???"}</Text>
-                      <Text style={s.stageDetail}>
-                        {unlocked ? `HP ${stage.hp} | ${stage.timeLimit}초` : "이전 스테이지 클리어 필요"}
-                      </Text>
+                      <Text style={s.stageName}>{unlocked ? `${i + 1}층 - ${fl.name}` : `${i + 1}층 - ???`}</Text>
+                      {unlocked && !cleared && (
+                        <>
+                          <View style={s.floorHpBar}>
+                            <View style={[s.floorHpFill, { width: `${100 - floorHpPct}%` }]} />
+                          </View>
+                          <Text style={s.stageDetail}>
+                            HP {Math.max(0, fl.hp - dmgDone).toLocaleString()}/{fl.hp.toLocaleString()}
+                          </Text>
+                        </>
+                      )}
+                      {cleared && <Text style={[s.stageDetail, { color: "#4CFF4C" }]}>클리어!</Text>}
                     </View>
                     <Text style={s.stageReward}>
-                      {unlocked ? `💰${stage.rewardCoins}${stage.rewardMedals > 0 ? ` 👑${stage.rewardMedals}` : ""}` : ""}
+                      {unlocked ? `💰${fl.rewardCoins.toLocaleString()}${fl.rewardMedals > 0 ? ` 👑${fl.rewardMedals}` : ""}` : ""}
                     </Text>
-                  </Pressable>
+                  </View>
                 );
               })}
+
+              <Pressable
+                onPress={startBattle}
+                style={[s.startBtn, (!towerData || towerData.playsToday >= MAX_PLAYS_PER_DAY) && s.startBtnDisabled]}
+                disabled={!towerData || towerData.playsToday >= MAX_PLAYS_PER_DAY}
+              >
+                <Text style={s.startBtnText}>
+                  {towerData && towerData.playsToday >= MAX_PLAYS_PER_DAY ? "오늘 도전 완료" : "⚔️ 도전 시작!"}
+                </Text>
+              </Pressable>
 
               <Pressable onPress={handleClose} style={s.closeBtn}>
                 <Text style={s.closeBtnText}>닫기</Text>
@@ -223,22 +270,21 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
             </>
           )}
 
-          {phase === "battle" && (
+          {phase === "battle" && floor && (
             <>
+              <Text style={s.floorTitle}>{currentFloor + 1}층 - {floor.name}</Text>
               <Text style={s.timerText}>⏱ {timeLeft}초</Text>
 
-              {/* Boss HP bar */}
               <View style={s.bossHpContainer}>
                 <View style={[s.bossHpBar, { width: `${hpPercent}%`, backgroundColor: hpColor }]} />
               </View>
-              <Text style={s.bossHpText}>{bossHp}/{maxHp}</Text>
+              <Text style={s.bossHpText}>{remainHp.toLocaleString()}/{floor.hp.toLocaleString()}</Text>
 
-              {/* Boss */}
               <Pressable onPress={handleBossTap} style={s.bossArea}>
                 <Animated.View style={{ transform: [{ translateX: shakeAnim }, { scale: bossScale }] }}>
-                  <Text style={s.bossEmoji}>{BOSS_STAGES[selectedStage].emoji}</Text>
+                  <Text style={s.bossEmoji}>{floor.emoji}</Text>
                 </Animated.View>
-                <Text style={s.bossName}>{BOSS_STAGES[selectedStage].name}</Text>
+                <Text style={s.bossName}>{floor.name}</Text>
 
                 {showDmg && (
                   <Animated.Text
@@ -252,31 +298,34 @@ export default function BossBattleModal({ visible, onClose, onReward, selectedGr
               <Text style={s.comboText}>
                 {comboCount > 0 ? `${comboCount} COMBO!` : "탭으로 공격!"}
               </Text>
-              <Text style={s.totalDmg}>총 데미지: {damageDealt}</Text>
+              <Text style={s.totalDmg}>이번 도전 데미지: {damageDealt.toLocaleString()}</Text>
+              {clearedFloors.length > 0 && (
+                <Text style={s.clearMsg}>🎉 {clearedFloors.length}층 클리어!</Text>
+              )}
             </>
           )}
 
           {phase === "result" && (
             <>
-              <Text style={s.resultEmoji}>{victory ? "🎉" : "💀"}</Text>
-              <Text style={s.resultTitle}>{victory ? "승리!" : "패배..."}</Text>
-              <Text style={s.resultDesc}>
-                {victory
-                  ? `${BOSS_STAGES[selectedStage].name}을(를) 처치했습니다!`
-                  : `시간 초과! 남은 HP: ${bossHp}`}
+              <Text style={s.resultEmoji}>{clearedFloors.length > 0 ? "🎉" : "⏰"}</Text>
+              <Text style={s.resultTitle}>
+                {clearedFloors.length > 0 ? `${clearedFloors.length}층 클리어!` : "시간 종료!"}
               </Text>
-              {victory && (
+              <Text style={s.resultDesc}>
+                이번 도전 데미지: {damageDealt.toLocaleString()}{"\n"}
+                콤보: {comboCount}
+              </Text>
+              {clearedFloors.length > 0 && (
                 <View style={s.rewardBox}>
                   <Text style={s.rewardText}>
-                    💰 {BOSS_STAGES[selectedStage].rewardCoins} 코인
-                    {BOSS_STAGES[selectedStage].rewardMedals > 0
-                      ? ` + 👑 ${BOSS_STAGES[selectedStage].rewardMedals} 메달`
-                      : ""}
-                    {" 획득!"}
+                    획득 보상: 💰 {totalRewardCoins.toLocaleString()}
+                    {totalRewardMedals > 0 ? ` + 👑 ${totalRewardMedals.toLocaleString()}` : ""}
                   </Text>
                 </View>
               )}
-              <Text style={s.resultStats}>총 데미지: {damageDealt} | 콤보: {comboCount}</Text>
+              {clearedFloors.length === 0 && (
+                <Text style={s.encourageText}>내일 다시 도전하세요! 데미지는 누적됩니다.</Text>
+              )}
 
               <Pressable onPress={() => setPhase("select")} style={s.closeBtn}>
                 <Text style={s.closeBtnText}>확인</Text>
@@ -300,9 +349,9 @@ const s = StyleSheet.create({
   container: {
     backgroundColor: "#1a1a2e",
     borderRadius: 22,
-    width: "88%",
-    maxWidth: 380,
-    maxHeight: Dimensions.get("window").height * 0.85,
+    width: "90%",
+    maxWidth: 400,
+    maxHeight: Dimensions.get("window").height * 0.88,
     borderWidth: 1,
     borderColor: "rgba(100,120,255,0.2)",
   },
@@ -333,40 +382,44 @@ const s = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(35,35,70,0.9)",
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     width: "100%",
-    marginBottom: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: "rgba(80,80,140,0.3)",
   },
-  stageBtnLocked: {
-    opacity: 0.4,
+  stageBtnLocked: { opacity: 0.35 },
+  stageBtnCleared: { borderColor: "rgba(76,255,76,0.3)", backgroundColor: "rgba(30,50,30,0.9)" },
+  stageEmoji: { fontSize: 26, width: 38, textAlign: "center", marginRight: 10 },
+  stageInfo: { flex: 1 },
+  stageName: { color: "#fff", fontSize: 13, fontWeight: "bold" },
+  stageDetail: { color: "rgba(255,255,255,0.4)", fontSize: 10, marginTop: 2 },
+  stageReward: { color: "#FFA500", fontSize: 10, fontWeight: "bold" },
+  floorHpBar: {
+    width: "100%",
+    height: 5,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginTop: 4,
   },
-  stageEmoji: {
-    fontSize: 30,
-    width: 44,
-    textAlign: "center",
-    marginRight: 10,
+  floorHpFill: {
+    height: "100%",
+    backgroundColor: "#FF4444",
+    borderRadius: 3,
   },
-  stageInfo: {
-    flex: 1,
+  startBtn: {
+    marginTop: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    backgroundColor: "rgba(255,165,0,0.2)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,165,0,0.4)",
   },
-  stageName: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
-  stageDetail: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 11,
-    marginTop: 2,
-  },
-  stageReward: {
-    color: "#FFA500",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
+  startBtnDisabled: { opacity: 0.4 },
+  startBtnText: { color: "#FFA500", fontSize: 16, fontWeight: "bold" },
   closeBtn: {
     marginTop: 10,
     paddingVertical: 12,
@@ -376,18 +429,9 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  closeBtnText: {
-    color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  // Battle phase
-  timerText: {
-    color: "#FF4444",
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
+  closeBtnText: { color: "rgba(255,255,255,0.5)", fontSize: 14, fontWeight: "bold" },
+  floorTitle: { color: "#FFD700", fontSize: 18, fontWeight: "bold", marginBottom: 4 },
+  timerText: { color: "#FF4444", fontSize: 28, fontWeight: "bold", marginBottom: 8 },
   bossHpContainer: {
     width: "100%",
     height: 16,
@@ -397,67 +441,18 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  bossHpBar: {
-    height: "100%",
-    borderRadius: 8,
-  },
-  bossHpText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 4,
-    marginBottom: 10,
-  },
-  bossArea: {
-    alignItems: "center",
-    padding: 20,
-    position: "relative",
-  },
-  bossEmoji: {
-    fontSize: 80,
-  },
-  bossName: {
-    color: "#FF4444",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
-  dmgText: {
-    position: "absolute",
-    top: 10,
-    right: 20,
-    color: "#FF4444",
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  comboText: {
-    color: "#FFD700",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 4,
-  },
-  totalDmg: {
-    color: "rgba(255,255,255,0.4)",
-    fontSize: 12,
-    marginTop: 4,
-  },
-  // Result phase
-  resultEmoji: {
-    fontSize: 60,
-    marginBottom: 8,
-  },
-  resultTitle: {
-    color: "#fff",
-    fontSize: 26,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  resultDesc: {
-    color: "rgba(255,255,255,0.6)",
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 10,
-  },
+  bossHpBar: { height: "100%", borderRadius: 8 },
+  bossHpText: { color: "#fff", fontSize: 12, fontWeight: "bold", marginTop: 4, marginBottom: 10 },
+  bossArea: { alignItems: "center", padding: 20, position: "relative" },
+  bossEmoji: { fontSize: 80 },
+  bossName: { color: "#FF4444", fontSize: 18, fontWeight: "bold", marginTop: 8 },
+  dmgText: { position: "absolute", top: 10, right: 20, color: "#FF4444", fontSize: 24, fontWeight: "bold" },
+  comboText: { color: "#FFD700", fontSize: 18, fontWeight: "bold", marginTop: 4 },
+  totalDmg: { color: "rgba(255,255,255,0.4)", fontSize: 12, marginTop: 4 },
+  clearMsg: { color: "#4CFF4C", fontSize: 16, fontWeight: "bold", marginTop: 8 },
+  resultEmoji: { fontSize: 60, marginBottom: 8 },
+  resultTitle: { color: "#fff", fontSize: 26, fontWeight: "bold", marginBottom: 8 },
+  resultDesc: { color: "rgba(255,255,255,0.6)", fontSize: 14, textAlign: "center", marginBottom: 10 },
   rewardBox: {
     backgroundColor: "rgba(50,200,50,0.15)",
     borderRadius: 12,
@@ -467,15 +462,6 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(50,200,50,0.3)",
   },
-  rewardText: {
-    color: "#4CFF4C",
-    fontSize: 15,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  resultStats: {
-    color: "rgba(255,255,255,0.3)",
-    fontSize: 12,
-    marginBottom: 4,
-  },
+  rewardText: { color: "#4CFF4C", fontSize: 15, fontWeight: "bold", textAlign: "center" },
+  encourageText: { color: "rgba(255,215,0,0.6)", fontSize: 13, textAlign: "center", marginBottom: 8 },
 });

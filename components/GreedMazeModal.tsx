@@ -34,15 +34,15 @@ interface Props {
 
 function getTileIcon(subType: string): string {
   switch (subType) {
-    case "start": return "\u{1F3C1}";    // flag
-    case "goal": return "\u{1F3C1}";     // flag
-    case "coin": return "\u{1F4B0}";     // money bag
-    case "treasure": return "\u{1F48E}"; // gem
-    case "xp": return "\u2B50";          // star
-    case "tapBuff": return "\u{1F525}";  // fire
-    case "hpDown": return "\u{1F494}";   // broken heart
-    case "tapDebuff": return "\u{1F40C}";// snail
-    case "jackpot": return "\u{1F381}";  // gift
+    case "start": return "\u{1F3C1}";
+    case "goal": return "\u{1F3C1}";
+    case "coin": return "\u{1F4B0}";
+    case "treasure": return "\u{1F48E}";
+    case "xp": return "\u2B50";
+    case "tapBuff": return "\u{1F525}";
+    case "hpDown": return "\u{1F494}";
+    case "tapDebuff": return "\u{1F40C}";
+    case "jackpot": return "\u{1F381}";
     default: return "?";
   }
 }
@@ -51,28 +51,28 @@ function getTileLabel(subType: string): string {
   switch (subType) {
     case "start": return "START";
     case "goal": return "GOAL";
-    case "coin": return "\uCF54\uC778";
-    case "treasure": return "\uBCF4\uBB3C";
-    case "xp": return "\uACBD\uD5D8\uCE58";
-    case "tapBuff": return "2\uBC30";
+    case "coin": return "코인";
+    case "treasure": return "보물";
+    case "xp": return "경험치";
+    case "tapBuff": return "2배";
     case "hpDown": return "HP\u2193";
-    case "tapDebuff": return "0.5\uBC30";
-    case "jackpot": return "\uB300\uBC15";
+    case "tapDebuff": return "0.5배";
+    case "jackpot": return "대박";
     default: return "";
   }
 }
 
 function getTileResultText(tile: MazeTile): string {
   switch (tile.subType) {
-    case "start": return "\uCD9C\uBC1C!";
-    case "goal": return "\u{1F38A} \uBBF8\uB85C \uC644\uC8FC! +500 \uCF54\uC778";
-    case "coin": return `\u{1F4B0} +${tile.value} \uCF54\uC778`;
-    case "treasure": return `\u{1F48E} +${tile.value} \uCF54\uC778`;
+    case "start": return "출발!";
+    case "goal": return `\u{1F38A} 미로 완주! +500 코인`;
+    case "coin": return `\u{1F4B0} +${tile.value} 코인`;
+    case "treasure": return `\u{1F48E} +${tile.value} 코인`;
     case "xp": return `\u2B50 +${tile.value} XP`;
-    case "tapBuff": return `\u{1F525} 10\uBD84\uAC04 \uD0ED \uC810\uC218 2\uBC30!`;
-    case "hpDown": return `\u{1F494} \uBAA8\uB4E0 \uACE0\uC591\uC774 HP -${tile.value}`;
-    case "tapDebuff": return `\u{1F40C} 10\uBD84\uAC04 \uD0ED \uC810\uC218 0.5\uBC30...`;
-    case "jackpot": return `\u{1F381} \uB300\uBC15! +${tile.value} \uCF54\uC778!`;
+    case "tapBuff": return `\u{1F525} 10분간 탭 점수 2배!`;
+    case "hpDown": return `\u{1F494} 모든 고양이 HP -${tile.value}`;
+    case "tapDebuff": return `\u{1F40C} 10분간 탭 점수 0.5배...`;
+    case "jackpot": return `\u{1F381} 대박! +${tile.value} 코인!`;
     default: return "";
   }
 }
@@ -105,7 +105,6 @@ function generateMaze(): MazeTile[] {
 }
 
 // ---- Snake layout: compute row-based ordering ----
-// Rows alternate direction: row0 L->R, row1 R->L, row2 L->R, etc.
 
 function getSnakeOrder(): number[][] {
   const rows: number[][] = [];
@@ -137,22 +136,16 @@ export default function GreedMazeModal({
   const [mazeData, setMazeDataState] = useState<MazeData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Dice rolling
   const [rolling, setRolling] = useState(false);
   const [diceDisplay, setDiceDisplay] = useState(1);
   const [diceResult, setDiceResult] = useState<number | null>(null);
 
-  // Movement animation
   const [animating, setAnimating] = useState(false);
   const [displayPosition, setDisplayPosition] = useState(0);
 
-  // Tile effect popup
   const [effectPopup, setEffectPopup] = useState<string | null>(null);
-
-  // Completion celebration
   const [showCelebration, setShowCelebration] = useState(false);
 
-  // Pulsing glow for current tile
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const popupOpacity = useRef(new Animated.Value(0)).current;
   const celebrationScale = useRef(new Animated.Value(0)).current;
@@ -160,7 +153,6 @@ export default function GreedMazeModal({
   const scrollRef = useRef<ScrollView>(null);
   const snakeRows = useRef(getSnakeOrder()).current;
 
-  // ---- Load maze on open ----
   useEffect(() => {
     if (!visible) return;
     setLoading(true);
@@ -179,22 +171,17 @@ export default function GreedMazeModal({
     })();
   }, [visible]);
 
-  // ---- Pulse animation ----
   useEffect(() => {
     if (!visible) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
+          toValue: 1, duration: 800,
+          easing: Easing.inOut(Easing.ease), useNativeDriver: false,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0,
-          duration: 800,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: false,
+          toValue: 0, duration: 800,
+          easing: Easing.inOut(Easing.ease), useNativeDriver: false,
         }),
       ])
     );
@@ -202,73 +189,48 @@ export default function GreedMazeModal({
     return () => loop.stop();
   }, [visible]);
 
-  // ---- Apply tile effect ----
   const applyTileEffect = useCallback(
     (tile: MazeTile) => {
       switch (tile.subType) {
-        case "coin":
-        case "treasure":
-        case "jackpot":
-          onRewardCoins(tile.value);
-          break;
+        case "coin": case "treasure": case "jackpot":
+          onRewardCoins(tile.value); break;
         case "xp":
-          onRewardXp(tile.value);
-          break;
+          onRewardXp(tile.value); break;
         case "tapBuff":
-          onBuff(2.0, BUFF_DURATION_MS);
-          break;
+          onBuff(2.0, BUFF_DURATION_MS); break;
         case "hpDown":
-          onHpPenalty(tile.value);
-          break;
+          onHpPenalty(tile.value); break;
         case "tapDebuff":
-          onBuff(0.5, BUFF_DURATION_MS);
-          break;
+          onBuff(0.5, BUFF_DURATION_MS); break;
         case "goal":
-          onRewardCoins(tile.value);
-          break;
-        default:
-          break;
+          onRewardCoins(tile.value); break;
       }
     },
     [onRewardCoins, onRewardXp, onBuff, onHpPenalty]
   );
 
-  // ---- Show effect popup ----
   const showEffectPopup = useCallback(
     (text: string, duration: number = 2000) => {
       setEffectPopup(text);
       popupOpacity.setValue(1);
       Animated.sequence([
         Animated.delay(duration - 400),
-        Animated.timing(popupOpacity, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: false,
-        }),
-      ]).start(() => {
-        setEffectPopup(null);
-      });
+        Animated.timing(popupOpacity, { toValue: 0, duration: 400, useNativeDriver: false }),
+      ]).start(() => setEffectPopup(null));
     },
     []
   );
 
-  // ---- Handle maze completion ----
   const handleCompletion = useCallback(async () => {
     setShowCelebration(true);
     celebrationScale.setValue(0);
     Animated.spring(celebrationScale, {
-      toValue: 1,
-      friction: 4,
-      tension: 60,
-      useNativeDriver: true,
+      toValue: 1, friction: 4, tension: 60, useNativeDriver: true,
     }).start();
 
-    // Wait, then reshuffle
     setTimeout(async () => {
       const newData: MazeData = {
-        currentPosition: 0,
-        tiles: generateMaze(),
-        completed: false,
+        currentPosition: 0, tiles: generateMaze(), completed: false,
       };
       await storage.setMazeData(newData);
       setMazeDataState(newData);
@@ -278,7 +240,6 @@ export default function GreedMazeModal({
     }, 2500);
   }, []);
 
-  // ---- Roll dice ----
   const handleRollDice = useCallback(async () => {
     if (rolling || animating || !mazeData || greedDice <= 0) return;
 
@@ -286,7 +247,6 @@ export default function GreedMazeModal({
     setRolling(true);
     setDiceResult(null);
 
-    // Dice cycling animation (~1 second)
     const cycleInterval = setInterval(() => {
       setDiceDisplay(Math.floor(Math.random() * 6) + 1);
     }, 80);
@@ -298,20 +258,17 @@ export default function GreedMazeModal({
       setDiceResult(result);
       setRolling(false);
 
-      // Move player
       const currentPos = mazeData.currentPosition;
       const targetPos = Math.min(currentPos + result, 19);
 
       setAnimating(true);
 
-      // Animate tile by tile
       let step = currentPos;
       const moveInterval = setInterval(() => {
         step++;
         if (step > targetPos) {
           clearInterval(moveInterval);
 
-          // Update state
           const landed = mazeData.tiles[targetPos];
           const updatedData: MazeData = {
             ...mazeData,
@@ -321,19 +278,16 @@ export default function GreedMazeModal({
           setMazeDataState(updatedData);
           storage.setMazeData(updatedData);
 
-          // Apply effect and show popup
           if (landed.subType !== "start") {
             applyTileEffect(landed);
             showEffectPopup(getTileResultText(landed));
           }
 
-          // Check completion
           if (targetPos >= 19) {
             setTimeout(() => handleCompletion(), 2200);
           } else {
             setAnimating(false);
           }
-
           return;
         }
         setDisplayPosition(step);
@@ -341,18 +295,9 @@ export default function GreedMazeModal({
     }, 1000);
   }, [rolling, animating, mazeData, greedDice, onUseDice, applyTileEffect, showEffectPopup, handleCompletion]);
 
-  // ---- Dice emoji ----
-  const diceEmojis = [
-    "\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685",
-  ];
+  const diceEmojis = ["\u2680", "\u2681", "\u2682", "\u2683", "\u2684", "\u2685"];
 
-  // ---- Render ----
   if (!visible) return null;
-
-  const glowColor = pulseAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["rgba(255,215,0,0.3)", "rgba(255,215,0,0.9)"],
-  });
 
   const glowShadow = pulseAnim.interpolate({
     inputRange: [0, 1],
@@ -360,19 +305,12 @@ export default function GreedMazeModal({
   });
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>
-              {"\u{1F30C}"} \uD0D0\uC695\uC758 \uBBF8\uB85C
-            </Text>
+            <Text style={styles.title}>{"\u{1F30C}"} 탐욕의 미로</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Text style={styles.closeBtnText}>{"\u2715"}</Text>
             </Pressable>
@@ -380,7 +318,7 @@ export default function GreedMazeModal({
 
           {loading ? (
             <View style={styles.loadingWrap}>
-              <Text style={styles.loadingText}>\uBBF8\uB85C \uBD88\uB7EC\uC624\uB294 \uC911...</Text>
+              <Text style={styles.loadingText}>미로 불러오는 중...</Text>
             </View>
           ) : mazeData ? (
             <>
@@ -437,7 +375,6 @@ export default function GreedMazeModal({
                         </Animated.View>
                       );
                     })}
-                    {/* Fill empty slots in last row */}
                     {row.length < TILES_PER_ROW &&
                       Array.from({ length: TILES_PER_ROW - row.length }).map(
                         (_, i) => (
@@ -450,9 +387,7 @@ export default function GreedMazeModal({
 
               {/* Effect Popup */}
               {effectPopup && (
-                <Animated.View
-                  style={[styles.effectPopup, { opacity: popupOpacity }]}
-                >
+                <Animated.View style={[styles.effectPopup, { opacity: popupOpacity }]}>
                   <Text style={styles.effectPopupText}>{effectPopup}</Text>
                 </Animated.View>
               )}
@@ -460,19 +395,12 @@ export default function GreedMazeModal({
               {/* Celebration */}
               {showCelebration && (
                 <Animated.View
-                  style={[
-                    styles.celebration,
-                    { transform: [{ scale: celebrationScale }] },
-                  ]}
+                  style={[styles.celebration, { transform: [{ scale: celebrationScale }] }]}
                 >
-                  <Text style={styles.celebrationEmoji}>
-                    {"\u{1F38A}"}
-                  </Text>
-                  <Text style={styles.celebrationText}>
-                    \uBBF8\uB85C \uC644\uC8FC!
-                  </Text>
+                  <Text style={styles.celebrationEmoji}>{"\u{1F38A}"}</Text>
+                  <Text style={styles.celebrationText}>미로 완주!</Text>
                   <Text style={styles.celebrationSub}>
-                    +500 \uCF54\uC778 \uBCF4\uB108\uC2A4!{"\n"}\uBBF8\uB85C\uAC00 \uC0C8\uB85C \uC0DD\uC131\uB429\uB2C8\uB2E4...
+                    {"+500 코인 보너스!\n미로가 새로 생성됩니다..."}
                   </Text>
                 </Animated.View>
               )}
@@ -484,17 +412,17 @@ export default function GreedMazeModal({
                 </Text>
                 {diceResult !== null && !rolling && (
                   <Text style={styles.diceResultText}>
-                    {diceResult}\uCE78 \uC804\uC9C4!
+                    {diceResult}{"칸 전진!"}
                   </Text>
                 )}
                 <Text style={styles.diceCount}>
-                  \uD0D0\uC695\uC758 \uC8FC\uC0AC\uC704: {greedDice}\uAC1C
+                  {"탐욕의 주사위: "}{greedDice}{"개"}
                 </Text>
 
                 {greedDice <= 0 && !rolling && !animating ? (
                   <View style={styles.noDiceWrap}>
                     <Text style={styles.noDiceText}>
-                      \uC8FC\uC0AC\uC704\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4! \uC0C1\uC810\uC5D0\uC11C \uAD6C\uB9E4\uD558\uC138\uC694
+                      {"주사위가 없습니다! 상점에서 구매하세요"}
                     </Text>
                   </View>
                 ) : (
@@ -508,10 +436,10 @@ export default function GreedMazeModal({
                   >
                     <Text style={styles.rollBtnText}>
                       {rolling
-                        ? "\uAD74\uB9AC\uB294 \uC911..."
+                        ? "굴리는 중..."
                         : animating
-                        ? "\uC774\uB3D9 \uC911..."
-                        : "\u{1F3B2} \uC8FC\uC0AC\uC704 \uAD74\uB9AC\uAE30"}
+                        ? "이동 중..."
+                        : "\u{1F3B2} 주사위 굴리기"}
                     </Text>
                   </Pressable>
                 )}
@@ -527,7 +455,6 @@ export default function GreedMazeModal({
 // ---- Styles ----
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const BOARD_WIDTH = TILES_PER_ROW * (TILE_SIZE + TILE_GAP) + TILE_GAP;
 
 const styles = StyleSheet.create({
   overlay: {
@@ -572,8 +499,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-
-  // Loading
   loadingWrap: {
     padding: 40,
     alignItems: "center",
@@ -582,8 +507,6 @@ const styles = StyleSheet.create({
     color: "#aaa",
     fontSize: 14,
   },
-
-  // Board
   boardScroll: {
     flexGrow: 0,
     maxHeight: 420,
@@ -597,8 +520,6 @@ const styles = StyleSheet.create({
     marginBottom: TILE_GAP,
     justifyContent: "center",
   },
-
-  // Tiles
   tile: {
     width: TILE_SIZE,
     height: TILE_SIZE,
@@ -654,8 +575,6 @@ const styles = StyleSheet.create({
     height: TILE_SIZE,
     marginHorizontal: TILE_GAP / 2,
   },
-
-  // Effect Popup
   effectPopup: {
     position: "absolute",
     top: "40%",
@@ -674,8 +593,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-
-  // Celebration
   celebration: {
     position: "absolute",
     top: "30%",
@@ -705,8 +622,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-
-  // Dice Area
   diceArea: {
     alignItems: "center",
     paddingVertical: 14,

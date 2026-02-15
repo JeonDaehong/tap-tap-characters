@@ -676,12 +676,14 @@ const styles = StyleSheet.create({
 
   // ---- Grid ----
   grid: {
+    width: "100%",
     alignItems: "center",
     marginVertical: 8,
   },
   gridRow: {
     flexDirection: "row",
     justifyContent: "center",
+    width: "100%",
   },
 
   // ---- Card ----

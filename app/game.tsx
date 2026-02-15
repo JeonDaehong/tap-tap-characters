@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Animated,
   Modal,
+  ScrollView,
   AppState,
   AppStateStatus,
   BackHandler,
@@ -441,7 +442,7 @@ export default function GameScreen() {
       if (updated.level !== prev.level) {
         // Level up! Show modal with unlock info
         const LEVEL_UNLOCKS: Record<number, string[]> = {
-          2: ["강화 시스템", "상점", "아이템창"],
+          2: ["강화 시스템", "상점", "아이템창", "탐욕의 미로"],
           3: ["오늘의 운세"],
           4: ["단기 원정"],
           5: ["기억력 게임"],
@@ -775,7 +776,7 @@ export default function GameScreen() {
       storage.setPlayerLevel(updated);
       if (updated.level !== prev.level) {
         const LEVEL_UNLOCKS: Record<number, string[]> = {
-          2: ["강화 시스템", "상점", "아이템창"], 3: ["오늘의 운세"], 4: ["단기 원정"],
+          2: ["강화 시스템", "상점", "아이템창", "탐욕의 미로"], 3: ["오늘의 운세"], 4: ["단기 원정"],
           5: ["기억력 게임"], 6: ["황금왕관 뽑기", "스킨 뽑기"], 7: ["중기 원정"],
           8: ["도전의 탑"], 9: ["장기 원정"], 10: ["랭킹"],
         };
@@ -1089,104 +1090,122 @@ export default function GameScreen() {
       {/* More menu modal */}
       <Modal visible={moreMenuVisible} transparent animationType="fade" onRequestClose={() => setMoreMenuVisible(false)}>
         <Pressable style={styles.gachaOverlay} onPress={() => setMoreMenuVisible(false)}>
-          <View style={styles.gachaMenu} onStartShouldSetResponder={() => true}>
+          <View style={styles.gachaMenuScrollable} onStartShouldSetResponder={() => true}>
             <Text style={styles.gachaMenuTitle}>메뉴</Text>
             <View style={styles.menuDivider} />
 
-            <Pressable
-              style={[styles.gachaMenuItem, playerLevel.level < 3 && styles.gachaMenuItemDisabled]}
-              onPress={() => {
-                if (playerLevel.level >= 3) {
-                  setMoreMenuVisible(false);
-                  setMiniGameMenuVisible(true);
-                } else {
-                  setMoreMenuVisible(false);
-                  setLockModalInfo({ feature: "미니게임", level: 3 });
-                }
-              }}
-            >
-              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 3 ? "🔒" : "🎮"}</Text>
-              <Text style={styles.gachaMenuText}>미니게임</Text>
-            </Pressable>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.menuScrollContent}>
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 3 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 3) {
+                    setMoreMenuVisible(false);
+                    setMiniGameMenuVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "미니게임", level: 3 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 3 ? "🔒" : "🎮"}</Text>
+                <Text style={styles.gachaMenuText}>미니게임</Text>
+              </Pressable>
 
-            <Pressable
-              style={[styles.gachaMenuItem, playerLevel.level < 4 && styles.gachaMenuItemDisabled]}
-              onPress={() => {
-                if (playerLevel.level >= 4) {
-                  setMoreMenuVisible(false);
-                  setExpeditionVisible(true);
-                } else {
-                  setMoreMenuVisible(false);
-                  setLockModalInfo({ feature: "원정대", level: 4 });
-                }
-              }}
-            >
-              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 4 ? "🔒" : "⚔️"}</Text>
-              <Text style={styles.gachaMenuText}>원정대</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 4 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 4) {
+                    setMoreMenuVisible(false);
+                    setExpeditionVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "원정대", level: 4 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 4 ? "🔒" : "⚔️"}</Text>
+                <Text style={styles.gachaMenuText}>원정대</Text>
+              </Pressable>
 
-            <Pressable
-              style={[styles.gachaMenuItem, playerLevel.level < 8 && styles.gachaMenuItemDisabled]}
-              onPress={() => {
-                if (playerLevel.level >= 8) {
-                  setMoreMenuVisible(false);
-                  setBossVisible(true);
-                } else {
-                  setMoreMenuVisible(false);
-                  setLockModalInfo({ feature: "도전의 탑", level: 8 });
-                }
-              }}
-            >
-              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 8 ? "🔒" : "🏰"}</Text>
-              <Text style={styles.gachaMenuText}>도전의 탑</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 8 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 8) {
+                    setMoreMenuVisible(false);
+                    setBossVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "도전의 탑", level: 8 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 8 ? "🔒" : "🏰"}</Text>
+                <Text style={styles.gachaMenuText}>도전의 탑</Text>
+              </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setQuestVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>📋</Text>
-              <Text style={styles.gachaMenuText}>과제</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 2) {
+                    setMoreMenuVisible(false);
+                    setMazeVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "탐욕의 미로", level: 2 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🌌"}</Text>
+                <Text style={styles.gachaMenuText}>탐욕의 미로</Text>
+              </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAchievementModalVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>🏅</Text>
-              <Text style={styles.gachaMenuText}>업적</Text>
-            </Pressable>
+              <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setQuestVisible(true); }}>
+                <Text style={styles.gachaMenuEmoji}>📋</Text>
+                <Text style={styles.gachaMenuText}>과제</Text>
+              </Pressable>
 
-            <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAttendanceVisible(true); }}>
-              <Text style={styles.gachaMenuEmoji}>📅</Text>
-              <Text style={styles.gachaMenuText}>출석 체크</Text>
-            </Pressable>
+              <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAchievementModalVisible(true); }}>
+                <Text style={styles.gachaMenuEmoji}>🏅</Text>
+                <Text style={styles.gachaMenuText}>업적</Text>
+              </Pressable>
 
-            <Pressable
-              style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
-              onPress={() => {
-                if (playerLevel.level >= 2) {
-                  setMoreMenuVisible(false);
-                  setShopVisible(true);
-                } else {
-                  setMoreMenuVisible(false);
-                  setLockModalInfo({ feature: "상점", level: 2 });
-                }
-              }}
-            >
-              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🏪"}</Text>
-              <Text style={styles.gachaMenuText}>상점</Text>
-            </Pressable>
+              <Pressable style={styles.gachaMenuItem} onPress={() => { setMoreMenuVisible(false); setAttendanceVisible(true); }}>
+                <Text style={styles.gachaMenuEmoji}>📅</Text>
+                <Text style={styles.gachaMenuText}>출석 체크</Text>
+              </Pressable>
 
-            <Pressable
-              style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
-              onPress={() => {
-                if (playerLevel.level >= 2) {
-                  setMoreMenuVisible(false);
-                  setInventoryVisible(true);
-                } else {
-                  setMoreMenuVisible(false);
-                  setLockModalInfo({ feature: "아이템창", level: 2 });
-                }
-              }}
-            >
-              <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🎒"}</Text>
-              <Text style={styles.gachaMenuText}>아이템창</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 2) {
+                    setMoreMenuVisible(false);
+                    setShopVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "상점", level: 2 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🏪"}</Text>
+                <Text style={styles.gachaMenuText}>상점</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.gachaMenuItem, playerLevel.level < 2 && styles.gachaMenuItemDisabled]}
+                onPress={() => {
+                  if (playerLevel.level >= 2) {
+                    setMoreMenuVisible(false);
+                    setInventoryVisible(true);
+                  } else {
+                    setMoreMenuVisible(false);
+                    setLockModalInfo({ feature: "아이템창", level: 2 });
+                  }
+                }}
+              >
+                <Text style={styles.gachaMenuEmoji}>{playerLevel.level < 2 ? "🔒" : "🎒"}</Text>
+                <Text style={styles.gachaMenuText}>아이템창</Text>
+              </Pressable>
+            </ScrollView>
 
             <Pressable onPress={() => setMoreMenuVisible(false)} style={styles.gachaMenuClose}>
               <Text style={styles.gachaMenuCloseText}>닫기</Text>
@@ -1296,6 +1315,25 @@ export default function GameScreen() {
         visible={achievementModalVisible}
         unlocked={unlockedAchievements}
         onClose={() => setAchievementModalVisible(false)}
+        onClaimReward={async (rewardCoins: number, rewardMedals: number, rewardXp: number) => {
+          if (rewardCoins > 0) {
+            const newCoins = coins + rewardCoins;
+            setCoins(newCoins);
+            await storage.setCoins(newCoins);
+          }
+          if (rewardMedals > 0) {
+            const newMedals = medals + rewardMedals;
+            setMedals(newMedals);
+            await storage.setMedals(newMedals);
+          }
+          if (rewardXp > 0) {
+            setPlayerLevel((prev: storage.PlayerLevelData) => {
+              const updated = storage.addPlayerXp(prev, rewardXp);
+              storage.setPlayerLevel(updated);
+              return updated;
+            });
+          }
+        }}
       />
 
       <SlotMachineModal
@@ -1391,6 +1429,13 @@ export default function GameScreen() {
         visible={questVisible}
         onClose={() => setQuestVisible(false)}
         onReward={handleQuestReward}
+        onRewardXp={(xp: number) => {
+          setPlayerLevel((prev: storage.PlayerLevelData) => {
+            const updated = storage.addPlayerXp(prev, xp);
+            storage.setPlayerLevel(updated);
+            return updated;
+          });
+        }}
         onClaimQuest={handleClaimQuest}
         questProgress={questProgress}
       />
@@ -1815,6 +1860,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+  },
+  gachaMenuScrollable: {
+    backgroundColor: "#1a1a2e",
+    borderRadius: 22,
+    padding: 24,
+    paddingBottom: 16,
+    width: "82%",
+    maxWidth: 340,
+    maxHeight: "75%",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(100,120,255,0.2)",
+    shadowColor: "#4060ff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  menuScrollContent: {
+    width: "100%",
+    flexGrow: 0,
   },
   gachaMenuClose: {
     marginTop: 8,
